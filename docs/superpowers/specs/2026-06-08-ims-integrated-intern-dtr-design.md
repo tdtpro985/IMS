@@ -36,7 +36,7 @@ Instead of a separate self-service registration website, the face enrollment flo
 
 ## 2. Database Schema Alterations
 
-We will update the `interns` table in the MySQL database to track face registration metadata. We will update [ims_schema.sql](file:///C:/Users/Keith/HRIS/INTERN-MANAGEMENT-SYSTEM/db/ims_schema.sql) and write a migration script (`db/add_face_columns.php`) to apply these changes to the active database.
+We will update the `interns` table in the MySQL database to track face registration metadata. We will update [ims_schema.sql](file:INTERN-MANAGEMENT-SYSTEM/db/ims_schema.sql) and write a migration script (`db/add_face_columns.php`) to apply these changes to the active database.
 
 ```sql
 ALTER TABLE interns 
@@ -65,7 +65,17 @@ We will add a new section in the IMS Admin Dashboard under the Interns list:
 
 ## 4. Face Registration Page (`register_face.php`)
 
-This public, standalone page handles the camera capture:
+This public, standalone web page handles the camera capture and is optimized specifically for mobile viewports (since interns will open the link on their mobile phones to use the front-facing camera):
+
+### 4.1 Mobile-First Premium Layout
+- **Responsive Layout**: Designed primarily for iOS/Android mobile browsers (Safari, Chrome) with a clean, single-column layout, touch-friendly inputs, and disabled page zooming.
+- **Visual Aesthetics**: Uses the Outfit/Inter typography, dark/light theme variables, and vibrant orange accents (`#FF6B1A`) consistent with the rest of the application.
+- **Guided Capture Interface**:
+  - Outlined circular webcam preview wrapper with a dynamic glowing scanning ring.
+  - Guided step indicators (dots showing progress as the intern completes each of the 5 capture angles).
+  - Clear user alerts and success/error status cards.
+
+### 4.2 Page Workflow
 1. **Access Validation**: The page extracts `$_GET['token']`. If invalid or empty, it shows a styled error card: *"This registration link has expired or is invalid."*
 2. **Confirm Profile**: Displays the intern's name to confirm identity.
 3. **Email Input**: Allows the intern to verify/input their email address (pre-filled if already in the DB).
