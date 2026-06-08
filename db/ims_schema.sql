@@ -52,6 +52,8 @@ CREATE TABLE interns (
     last_name           VARCHAR(80) NOT NULL,
     middle_name         VARCHAR(80),
     email               VARCHAR(150),
+    registration_token  VARCHAR(64) NULL UNIQUE,
+    token_expires_at    DATETIME NULL,
     phone               VARCHAR(30),
     address             TEXT,
     birthdate           DATE,
@@ -73,6 +75,9 @@ CREATE TABLE interns (
     supervisor          VARCHAR(100),
     status              ENUM('Active','Archived') NOT NULL DEFAULT 'Active',
     profile_photo       VARCHAR(255),
+    face_embedding      LONGTEXT NULL,
+    qr_code             VARCHAR(100) NULL UNIQUE,
+    face_registered_at  DATETIME NULL,
     -- Timestamps
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -112,6 +117,7 @@ CREATE TABLE dtr_entries (
                         END
                     ) STORED,
     is_archived     TINYINT(1) NOT NULL DEFAULT 0,
+    entry_source    ENUM('manual','kiosk') NOT NULL DEFAULT 'manual',
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (intern_id) REFERENCES interns(id)
