@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
              registration_token = NULL, token_expires_at = NULL 
          WHERE id = ?"
     );
-    $stmt->bind_param('ssssssi', $email, $embeddingsJson, $qrCode, $now, $profilePhotoName, $intern['id']);
+    $stmt->bind_param('sssssi', $email, $embeddingsJson, $qrCode, $now, $profilePhotoName, $intern['id']);
     $success = $stmt->execute();
     $stmt->close();
 
@@ -174,6 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <title>Face Registration — TDT Powersteel</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- MediaPipe Face Landmarker loaded dynamically in script -->
     <style>
         :root {
             --orange:       #FF6B1A;
@@ -471,10 +472,97 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             letter-spacing: 0.5px;
         }
 
+        /* Full screen glassmorphic loader */
+        .model-loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 18, 20, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            color: var(--white);
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+        .model-loading-overlay.fade-out {
+            opacity: 0;
+            visibility: hidden;
+        }
+        .loader-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--orange);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        /* Camera flash overlay */
+        .camera-flash {
+            position: absolute;
+            inset: 0;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .camera-flash.flash-active {
+            animation: flash-anim 0.15s ease-out;
+        }
+        @keyframes flash-anim {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        /* SVG Guide overlay elements */
+        .svg-guide-overlay {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+        .guide-circle {
+            fill: none;
+            stroke: rgba(255,255,255,0.4);
+            stroke-width: 3;
+            stroke-dasharray: 6 6;
+            transition: stroke 0.3s, stroke-dasharray 0.3s;
+        }
+        .guide-circle.aligned {
+            stroke: var(--orange);
+            stroke-dasharray: none;
+        }
+        .guide-circle.captured {
+            stroke: var(--success);
+            stroke-dasharray: none;
+        }
+        .guide-circle.error-state {
+            stroke: var(--danger);
+        }
+        /* Manual override button */
+        .btn-override {
+            background: var(--orange-light);
+            color: var(--orange);
+            border: 1px dashed var(--orange);
+            font-size: 12px;
+            padding: 8px 12px;
+            margin-top: 10px;
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
+
+<!-- Early loading screen overlay -->
+<div id="modelLoadingOverlay" class="model-loading-overlay">
+    <div class="loader-spinner"></div>
+    <div style="font-weight: 600; font-size: 15px;">Initializing Face Camera...</div>
+    <div style="font-size: 12px; color: rgba(255, 255, 255, 0.65);">Downloading neural network model files (~6.6MB)</div>
+</div>
 
 <div class="container">
     <div class="header">
@@ -514,8 +602,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div class="camera-box" id="cameraBox">
                     <video id="webcam" autoplay playsinline></video>
                     <div class="scanning-ring" id="scanningRing"></div>
-                    <div class="camera-overlay"></div>
+                    <div class="camera-overlay hidden"></div>
+                    <!-- Camera Flash Overlay -->
+                    <div id="cameraFlash" class="camera-flash"></div>
+                    <!-- Dynamic SVG face alignment guide overlay -->
+                    <svg class="svg-guide-overlay" viewBox="0 0 280 280">
+                        <circle class="guide-circle" id="guideCircle" cx="140" cy="140" r="95" />
+                    </svg>
                 </div>
+
+                <div id="faceWarningMessage" style="text-align: center; color: var(--danger); font-size: 12px; min-height: 18px; font-weight: 600; margin-bottom: 8px;"></div>
 
                 <div class="steps-bar">
                     <div class="step-dot" id="dot-0"></div>
@@ -530,7 +626,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                    <button type="button" class="btn btn-primary" id="captureBtn">Capture Angle</button>
+                    <button type="button" class="btn btn-primary hidden" id="captureBtn">Capture Angle</button>
                     <button type="button" class="btn btn-secondary" id="cancelCameraBtn">Back</button>
                 </div>
             </div>
@@ -560,6 +656,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 <script>
 <?php if ($intern): ?>
+let faceLandmarker = null;
+const overlay = document.getElementById('modelLoadingOverlay');
+
+async function initializeFaceDetector() {
+    try {
+        const visionModule = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/vision_bundle.mjs");
+        const vision = await visionModule.FilesetResolver.forVisionTasks(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
+        );
+        faceLandmarker = await visionModule.FaceLandmarker.createFromOptions(vision, {
+            baseOptions: {
+                modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+                delegate: "GPU"
+            },
+            outputFacialTransformationMatrixes: true,
+            runningMode: "VIDEO",
+            numFaces: 1
+        });
+        overlay.classList.add('fade-out');
+        console.log("MediaPipe Face Landmarker initialized successfully.");
+    } catch (err) {
+        console.error("Failed to load MediaPipe. Falling back to manual capture mode:", err);
+        overlay.classList.add('fade-out');
+        alert("Face detection service is unavailable. Falling back to manual capture mode.");
+    }
+}
+
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initializeFaceDetector);
+} else {
+    initializeFaceDetector();
+}
+
 const emailSection = document.getElementById('emailSection');
 const cameraSection = document.getElementById('cameraSection');
 const startCaptureBtn = document.getElementById('startCaptureBtn');
@@ -579,6 +708,194 @@ const dots = [
 ];
 const canvas = document.getElementById('captureCanvas');
 const ctx = canvas.getContext('2d');
+
+let lastVideoTime = -1;
+const faceWarningMessage = document.getElementById('faceWarningMessage');
+const guideCircle = document.getElementById('guideCircle');
+
+function runDetectionLoop() {
+    if (!stream) return;
+
+    let startTimeMs = performance.now();
+    if (webcam.currentTime !== lastVideoTime) {
+        lastVideoTime = webcam.currentTime;
+        
+        if (faceLandmarker) {
+            const results = faceLandmarker.detectForVideo(webcam, startTimeMs);
+            processLandmarkResults(results);
+        }
+    }
+    requestAnimationFrame(runDetectionLoop);
+}
+
+function processLandmarkResults(results) {
+    faceWarningMessage.innerText = "";
+    guideCircle.className.baseVal = "guide-circle";
+
+    if (!results || !results.faceLandmarks || results.faceLandmarks.length === 0) {
+        faceWarningMessage.innerText = "No face detected. Align your face in the circle.";
+        guideCircle.className.baseVal = "guide-circle error-state";
+        return;
+    }
+
+    if (results.faceLandmarks.length > 1) {
+        faceWarningMessage.innerText = "Multiple faces detected. Keep only one person in frame.";
+        guideCircle.className.baseVal = "guide-circle error-state";
+        return;
+    }
+
+    guideCircle.className.baseVal = "guide-circle aligned";
+
+    if (results.facialTransformationMatrixes && results.facialTransformationMatrixes.length > 0) {
+        const matrix = results.facialTransformationMatrixes[0].data;
+        
+        const yaw = Math.atan2(-matrix[8], matrix[10]) * (180 / Math.PI);
+        const pitch = Math.asin(Math.max(-1, Math.min(1, matrix[9]))) * (180 / Math.PI);
+        
+        const landmarks = results.faceLandmarks[0];
+        if (landmarks && landmarks[263] && landmarks[33]) {
+            const width = Math.abs(landmarks[263].x - landmarks[33].x);
+            processCaptureAngles(yaw, pitch, width);
+        }
+    }
+}
+
+let initialFaceSize = null;
+let lastCaptureTime = 0;
+const CAPTURE_COOLDOWN_MS = 1500;
+let overrideTimer = null;
+
+function playShutterSound() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const bufferSize = audioCtx.sampleRate * 0.15;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 1000;
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+        noise.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        const osc = audioCtx.createOscillator();
+        const oscGain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1500, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.08);
+        oscGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+        osc.connect(oscGain);
+        oscGain.connect(audioCtx.destination);
+
+        noise.start();
+        osc.start();
+        noise.stop(audioCtx.currentTime + 0.15);
+        osc.stop(audioCtx.currentTime + 0.15);
+        setTimeout(() => {
+            if (audioCtx.state !== 'closed') {
+                audioCtx.close();
+            }
+        }, 250);
+    } catch (e) {
+        console.warn(e);
+    }
+}
+
+function triggerScreenFlash() {
+    const flash = document.getElementById('cameraFlash');
+    if (flash) {
+        flash.classList.add('flash-active');
+        setTimeout(() => {
+            flash.classList.remove('flash-active');
+        }, 150);
+    }
+}
+
+function startOverrideTimer() {
+    clearOverrideTimer();
+    overrideTimer = setTimeout(() => {
+        if (document.getElementById('manualOverrideBtn')) return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'manualOverrideBtn';
+        btn.className = 'btn btn-override';
+        btn.innerText = 'Capture Manually (Stuck)';
+        btn.addEventListener('click', captureAutoAngle);
+        if (cancelCameraBtn && cancelCameraBtn.parentNode) {
+            cancelCameraBtn.parentNode.insertBefore(btn, cancelCameraBtn);
+        }
+    }, 10000);
+}
+
+function clearOverrideTimer() {
+    if (overrideTimer) {
+        clearTimeout(overrideTimer);
+        overrideTimer = null;
+    }
+    const btn = document.getElementById('manualOverrideBtn');
+    if (btn) {
+        btn.remove();
+    }
+}
+
+function captureAutoAngle() {
+    lastCaptureTime = Date.now();
+    playShutterSound();
+    triggerScreenFlash();
+    ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const base64Data = dataUrl.split(',')[1];
+    capturedImages.push(base64Data);
+    dots[currentStep].classList.remove('active');
+    dots[currentStep].classList.add('completed');
+    currentStep++;
+    if (currentStep < 5) {
+        updateStepUI();
+    } else {
+        submitFaceData();
+    }
+}
+
+function processCaptureAngles(yaw, pitch, faceWidth) {
+    if (Date.now() - lastCaptureTime < CAPTURE_COOLDOWN_MS) return;
+    let matched = false;
+    if (currentStep === 0) {
+        if (Math.abs(yaw) <= 15 && Math.abs(pitch) <= 15) {
+            initialFaceSize = faceWidth;
+            matched = true;
+        }
+    } else if (currentStep === 1) {
+        if (Math.abs(yaw) <= 15 && Math.abs(pitch) <= 15) {
+            if (initialFaceSize !== null && faceWidth <= initialFaceSize * 0.82) {
+                matched = true;
+            }
+        }
+    } else if (currentStep === 2) {
+        if (yaw >= 15) {
+            matched = true;
+        }
+    } else if (currentStep === 3) {
+        if (yaw <= -15) {
+            matched = true;
+        }
+    } else if (currentStep === 4) {
+        if (pitch >= 12) {
+            matched = true;
+        }
+    }
+    if (matched) {
+        captureAutoAngle();
+    }
+}
 
 let stream = null;
 let currentStep = 0;
@@ -609,6 +926,9 @@ startCaptureBtn.addEventListener('click', async () => {
             audio: false
         });
         webcam.srcObject = stream;
+        webcam.onloadedmetadata = () => {
+            runDetectionLoop();
+        };
         
         emailSection.classList.add('hidden');
         cameraSection.classList.remove('hidden');
@@ -626,27 +946,7 @@ startCaptureBtn.addEventListener('click', async () => {
 
 cancelCameraBtn.addEventListener('click', stopCamera);
 
-captureBtn.addEventListener('click', () => {
-    // Draw current frame to hidden canvas
-    ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height);
-    
-    // Convert canvas image to Base64 (data URI) and extract raw base64 string
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    const base64Data = dataUrl.split(',')[1];
-    capturedImages.push(base64Data);
-
-    // Update dot status
-    dots[currentStep].classList.remove('active');
-    dots[currentStep].classList.add('completed');
-
-    currentStep++;
-
-    if (currentStep < 5) {
-        updateStepUI();
-    } else {
-        submitFaceData();
-    }
-});
+captureBtn.addEventListener('click', captureAutoAngle);
 
 function updateStepUI() {
     dots.forEach((dot, idx) => {
@@ -658,9 +958,11 @@ function updateStepUI() {
     });
 
     captureInstructions.innerHTML = `<strong>Step ${currentStep + 1}: ${steps[currentStep].title}</strong><br><span style="font-size:12px; color:var(--text-muted)">${steps[currentStep].desc}</span>`;
+    startOverrideTimer();
 }
 
 function stopCamera() {
+    clearOverrideTimer();
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
         stream = null;
@@ -685,13 +987,13 @@ function submitFaceData() {
 
     const formData = new FormData();
     formData.append('action', 'submit_registration');
-    formData.append('token', '<?= htmlspecialchars($token) ?>');
+    formData.append('token', <?= json_encode($token) ?>);
     formData.append('email', internEmail.value.trim());
     capturedImages.forEach((img, idx) => {
         formData.append(`images[${idx}]`, img);
     });
 
-    fetch('/register', {
+    fetch('register', {
         method: 'POST',
         body: formData
     })
