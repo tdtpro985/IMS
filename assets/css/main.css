@@ -679,6 +679,8 @@ table.ims-table {
     overflow: hidden;
 }
 
+.intern-avatar img,
+#photoPreview { transform: scaleX(-1); }
 .intern-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .intern-card-name { font-size: 14px; font-weight: 600; }
