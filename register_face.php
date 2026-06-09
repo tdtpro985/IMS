@@ -1063,9 +1063,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <!-- Early loading screen overlay -->
     <div id="modelLoadingOverlay" class="model-loading-overlay">
         <div class="loader-spinner"></div>
-        <div style="font-weight: 600; font-size: 15px;">Initializing Face Camera...</div>
-        <div style="font-size: 12px; color: rgba(255, 255, 255, 0.65);">Downloading neural network model files (~6.6MB)
-        </div>
+        <div style="font-weight: 600; font-size: 15px;">Please wait</div>
+        <!-- <div style="font-size: 12px; color: rgba(255, 255, 255, 0.65);">Preparing Face Scanner...</div> -->
     </div>
 
     <!-- Onboarding Tutorial Modal -->
@@ -1087,7 +1086,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="tutorial-step-tag">Step 1 of 4</div>
                         <h3 class="tutorial-title">Look Straight</h3>
                         <p class="tutorial-desc">Align your face in the center of the frame and look directly at the
-                            camera.</p>
+                            camera.
+                            <span
+                                style="color: var(--orange); font-size: 11px; font-weight: 600; display: block; margin-top: 5px;">
+                                <i class="fas fa-glasses"></i> Remove glasses, masks, or hats for best results.
+                            </span>
+                        </p>
                         <div class="phone-mockup">
                             <div class="phone-screen">
                                 <img src="assets/img/guide_straight<?= $genderSuffix ?>.png" alt="Look Straight">
@@ -1100,7 +1104,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="tutorial-step-tag">Step 2 of 4</div>
                         <h3 class="tutorial-title">Turn Left</h3>
                         <p class="tutorial-desc">Rotate your head slightly to the left side so the camera captures your
-                            profile.</p>
+                            profile.
+                            <span
+                                style="font-size: 11px; display: block; margin-top: 5px; visibility: hidden;">&nbsp;</span>
+                        </p>
                         <div class="phone-mockup">
                             <div class="phone-screen">
                                 <img src="assets/img/guide_left<?= $genderSuffix ?>.png" alt="Turn Left">
@@ -1113,7 +1120,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="tutorial-step-tag">Step 3 of 4</div>
                         <h3 class="tutorial-title">Turn Right</h3>
                         <p class="tutorial-desc">Rotate your head slightly to the right side to capture your opposite
-                            profile.</p>
+                            profile.
+                            <span
+                                style="font-size: 11px; display: block; margin-top: 5px; visibility: hidden;">&nbsp;</span>
+                        </p>
                         <div class="phone-mockup">
                             <div class="phone-screen">
                                 <img src="assets/img/guide_right<?= $genderSuffix ?>.png" alt="Turn Right">
@@ -1125,7 +1135,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <div class="tutorial-slide" data-slide="3">
                         <div class="tutorial-step-tag">Step 4 of 4</div>
                         <h3 class="tutorial-title">Tilt Up</h3>
-                        <p class="tutorial-desc">Tilt your chin and head slightly upwards while facing forward.</p>
+                        <p class="tutorial-desc">Tilt your chin and head slightly upwards while facing forward.
+                            <span
+                                style="font-size: 11px; display: block; margin-top: 5px; visibility: hidden;">&nbsp;</span>
+                        </p>
                         <div class="phone-mockup">
                             <div class="phone-screen">
                                 <img src="assets/img/guide_up<?= $genderSuffix ?>.png" alt="Tilt Up">
@@ -1249,6 +1262,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                     <div class="capture-instructions" id="captureInstructions">
                         Click Start Capture to begin face registration
+                    </div>
+
+                    <!-- Obstruction warning tip -->
+                    <div
+                        style="text-align: center; margin-top: 10px; font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
+                        <i class="fas fa-glasses" style="color: var(--orange); margin-right: 4px;"></i> Remove glasses,
+                        masks, or hats to ensure accuracy.
                     </div>
 
                     <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
