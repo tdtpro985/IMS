@@ -5,6 +5,8 @@ require_once __DIR__ . '/config/audit.php';
 $db = getDB();
 $token = trim($_GET['token'] ?? $_POST['token'] ?? '');
 $intern = null;
+$expiredTitle = "Link Expired";
+$expiredText = "This registration link is invalid or has expired. Registration links expire 24 hours after generation. Please contact HR to get a new link.";
 
 if ($token) {
     // Validate token exists and has not expired (24hr TTL)
@@ -195,109 +197,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 <body>
 
-    <!-- Early loading screen overlay -->
-    <div id="modelLoadingOverlay" class="model-loading-overlay">
-        <div class="loader-spinner"></div>
-        <div class="model-loading-text">Please wait</div>
-        <!-- <div class="model-loading-subtext">Preparing Face Scanner...</div> -->
-    </div>
+    <?php if ($intern): ?>
+        <!-- Early loading screen overlay -->
+        <div id="modelLoadingOverlay" class="model-loading-overlay">
+            <div class="loader-spinner"></div>
+            <div class="model-loading-text">Please wait</div>
+            <!-- <div class="model-loading-subtext">Preparing Face Scanner...</div> -->
+        </div>
 
-    <!-- Onboarding Tutorial Modal -->
-    <div class="modal-overlay" id="tutorialModal">
-        <div class="modal-card">
+        <!-- Onboarding Tutorial Modal -->
+        <div class="modal-overlay" id="tutorialModal">
+            <div class="modal-card">
 
 
 
-            <!-- Scrollable Content Body -->
-            <div class="modal-body">
-                <!-- Slider Container -->
-                <div class="tutorial-slider">
+                <!-- Scrollable Content Body -->
+                <div class="modal-body">
+                    <!-- Slider Container -->
+                    <div class="tutorial-slider">
 
-                    <!-- Slide 1: Look Straight -->
-                    <div class="tutorial-slide active" data-slide="0">
-                        <div class="tutorial-step-tag">Step 1 of 4</div>
-                        <h3 class="tutorial-title">Look Straight</h3>
-                        <p class="tutorial-desc">Align your face in the center of the frame and look directly at the
-                            camera.
-                            <span class="tutorial-desc-warning">
-                                <i class="fas fa-glasses"></i> Remove glasses, masks, or hats for best results.
-                            </span>
-                        </p>
-                        <div class="phone-mockup">
-                            <div class="phone-screen">
-                                <img src="assets/img/guide_straight<?= $genderSuffix ?>.png" alt="Look Straight">
+                        <!-- Slide 1: Look Straight -->
+                        <div class="tutorial-slide active" data-slide="0">
+                            <div class="tutorial-step-tag">Step 1 of 4</div>
+                            <h3 class="tutorial-title">Look Straight</h3>
+                            <p class="tutorial-desc">Align your face in the center of the frame and look directly at the
+                                camera.
+                                <span class="tutorial-desc-warning">
+                                    <i class="fas fa-glasses"></i> Remove glasses, masks, or hats for best results.
+                                </span>
+                            </p>
+                            <div class="phone-mockup">
+                                <div class="phone-screen">
+                                    <img src="assets/img/guide_straight<?= $genderSuffix ?>.png" alt="Look Straight">
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Slide 2: Turn Left -->
-                    <div class="tutorial-slide" data-slide="1">
-                        <div class="tutorial-step-tag">Step 2 of 4</div>
-                        <h3 class="tutorial-title">Slightly Left</h3>
-                        <p class="tutorial-desc">Rotate your head slightly to the left side so the camera captures your
-                            side
-                            profile.
-                            <span class="tutorial-desc-spacer">&nbsp;</span>
-                        </p>
-                        <div class="phone-mockup">
-                            <div class="phone-screen">
-                                <img src="assets/img/guide_left<?= $genderSuffix ?>.png" alt="Turn Left">
+                        <!-- Slide 2: Turn Left -->
+                        <div class="tutorial-slide" data-slide="1">
+                            <div class="tutorial-step-tag">Step 2 of 4</div>
+                            <h3 class="tutorial-title">Slightly Left</h3>
+                            <p class="tutorial-desc">Rotate your head slightly to the left side so the camera captures your
+                                side
+                                profile.
+                                <span class="tutorial-desc-spacer">&nbsp;</span>
+                            </p>
+                            <div class="phone-mockup">
+                                <div class="phone-screen">
+                                    <img src="assets/img/guide_left<?= $genderSuffix ?>.png" alt="Turn Left">
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Slide 3: Turn Right -->
-                    <div class="tutorial-slide" data-slide="2">
-                        <div class="tutorial-step-tag">Step 3 of 4</div>
-                        <h3 class="tutorial-title">Slightly Right</h3>
-                        <p class="tutorial-desc">Rotate your head slightly to the right side to capture your side
-                            profile.
-                            <span class="tutorial-desc-spacer">&nbsp;</span>
-                        </p>
-                        <div class="phone-mockup">
-                            <div class="phone-screen">
-                                <img src="assets/img/guide_right<?= $genderSuffix ?>.png" alt="Turn Right">
+                        <!-- Slide 3: Turn Right -->
+                        <div class="tutorial-slide" data-slide="2">
+                            <div class="tutorial-step-tag">Step 3 of 4</div>
+                            <h3 class="tutorial-title">Slightly Right</h3>
+                            <p class="tutorial-desc">Rotate your head slightly to the right side to capture your side
+                                profile.
+                                <span class="tutorial-desc-spacer">&nbsp;</span>
+                            </p>
+                            <div class="phone-mockup">
+                                <div class="phone-screen">
+                                    <img src="assets/img/guide_right<?= $genderSuffix ?>.png" alt="Turn Right">
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Slide 4: Tilt Up -->
-                    <div class="tutorial-slide" data-slide="3">
-                        <div class="tutorial-step-tag">Step 4 of 4</div>
-                        <h3 class="tutorial-title">Tilt Up</h3>
-                        <p class="tutorial-desc">Tilt your chin and head slightly upwards while facing forward.
-                            <span class="tutorial-desc-spacer">&nbsp;</span>
-                        </p>
-                        <div class="phone-mockup">
-                            <div class="phone-screen">
-                                <img src="assets/img/guide_up<?= $genderSuffix ?>.png" alt="Tilt Up">
+                        <!-- Slide 4: Tilt Up -->
+                        <div class="tutorial-slide" data-slide="3">
+                            <div class="tutorial-step-tag">Step 4 of 4</div>
+                            <h3 class="tutorial-title">Tilt Up</h3>
+                            <p class="tutorial-desc">Tilt your chin and head slightly upwards while facing forward.
+                                <span class="tutorial-desc-spacer">&nbsp;</span>
+                            </p>
+                            <div class="phone-mockup">
+                                <div class="phone-screen">
+                                    <img src="assets/img/guide_up<?= $genderSuffix ?>.png" alt="Tilt Up">
+                                </div>
                             </div>
                         </div>
+
                     </div>
-
-                </div>
-            </div>
-
-            <!-- Fixed Footer -->
-            <div class="modal-footer">
-                <!-- Indicators -->
-                <div class="tutorial-dots" id="tutorialDots">
-                    <div class="tut-dot active" data-index="0"></div>
-                    <div class="tut-dot" data-index="1"></div>
-                    <div class="tut-dot" data-index="2"></div>
-                    <div class="tut-dot" data-index="3"></div>
                 </div>
 
-                <!-- Action button & Skip -->
-                <div class="modal-footer-actions">
-                    <button type="button" class="btn btn-primary w-100" id="tutNextBtn">
-                        Next <i class="fas fa-arrow-right ml-6"></i>
-                    </button>
-                    <button type="button" class="modal-skip-btn" id="skipTutorialBtn">Skip Tutorial</button>
+                <!-- Fixed Footer -->
+                <div class="modal-footer">
+                    <!-- Indicators -->
+                    <div class="tutorial-dots" id="tutorialDots">
+                        <div class="tut-dot active" data-index="0"></div>
+                        <div class="tut-dot" data-index="1"></div>
+                        <div class="tut-dot" data-index="2"></div>
+                        <div class="tut-dot" data-index="3"></div>
+                    </div>
+
+                    <!-- Action button & Skip -->
+                    <div class="modal-footer-actions">
+                        <button type="button" class="btn btn-primary w-100" id="tutNextBtn">
+                            Next <i class="fas fa-arrow-right ml-6"></i>
+                        </button>
+                        <button type="button" class="modal-skip-btn" id="skipTutorialBtn">Skip Tutorial</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    <?php endif; ?>
 
     <div class="container">
         <div class="header">
@@ -316,9 +320,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <!-- Token Expired / Invalid Page -->
             <div class="status-card">
                 <div class="status-icon danger"><i class="fas fa-times-circle"></i></div>
-                <div class="status-title">Link Expired or Invalid</div>
-                <div class="status-text">This registration link is invalid or has expired. Face registration links expire 24
-                    hours after generation. Please contact HR to get a new link.</div>
+                <div class="status-title"><?= htmlspecialchars($expiredTitle) ?></div>
+                <div class="status-text"><?= htmlspecialchars($expiredText) ?></div>
             </div>
         <?php else: ?>
             <!-- Main Form & Capture Section -->
@@ -444,46 +447,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         <?php endif; ?>
     </div>
 
-    <!-- Camera Error Help Modal -->
-    <div id="cameraErrorModal" class="modal-overlay hidden">
-        <div class="modal-card">
-            <div class="modal-header">
-                <i class="fas fa-video-slash modal-icon"></i>
-                <h2>Camera Access Required</h2>
-            </div>
-            <div class="modal-body">
-                <p class="modal-intro">We couldn't access your camera. This is usually due to browser permissions or
-                    restriction settings.</p>
-
-                <div class="help-section">
-                    <h3><i class="fab fa-facebook-messenger"></i> Using Messenger/Viber?</h3>
-                    <p>In-app browsers (like Facebook Messenger or Viber) block camera access. Tap the <strong>three
-                            dots (...)</strong> or the <strong>Share</strong> icon in the top right, then select
-                        <strong>"Open in Chrome"</strong> or <strong>"Open in Safari"</strong>.
-                    </p>
+    <?php if ($intern): ?>
+        <!-- Camera Error Help Modal -->
+        <div id="cameraErrorModal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <i class="fas fa-video-slash modal-icon"></i>
+                    <h2>Camera Access Required</h2>
                 </div>
+                <div class="modal-body">
+                    <p class="modal-intro">We couldn't access your camera. This is usually due to browser permissions or
+                        restriction settings.</p>
 
-                <div class="help-section">
-                    <h3><i class="fas fa-mobile-alt"></i> Enforce Phone Usage</h3>
-                    <p>We highly recommend using a <strong>smartphone</strong> rather than a laptop. Mobile front-facing
-                        cameras have significantly higher quality, better autofocus, and auto-exposure, leading to a
-                        much faster and more accurate face scan.</p>
-                </div>
+                    <div class="help-section">
+                        <h3><i class="fab fa-facebook-messenger"></i> Using Messenger/Viber?</h3>
+                        <p>In-app browsers (like Facebook Messenger or Viber) block camera access. Tap the <strong>three
+                                dots (...)</strong> or the <strong>Share</strong> icon in the top right, then select
+                            <strong>"Open in Chrome"</strong> or <strong>"Open in Safari"</strong>.
+                        </p>
+                    </div>
 
-                <div class="help-section">
-                    <h3><i class="fas fa-user-shield"></i> Grant Camera Permission</h3>
-                    <p>When prompted by your browser (Chrome/Safari), make sure to click <strong>"Allow"</strong> or
-                        <strong>"Grant Permission"</strong> to enable the camera.
-                    </p>
+                    <div class="help-section">
+                        <h3><i class="fas fa-mobile-alt"></i> Enforce Phone Usage</h3>
+                        <p>We highly recommend using a <strong>smartphone</strong> rather than a laptop. Mobile front-facing
+                            cameras have significantly higher quality, better autofocus, and auto-exposure, leading to a
+                            much faster and more accurate face scan.</p>
+                    </div>
+
+                    <div class="help-section">
+                        <h3><i class="fas fa-user-shield"></i> Grant Camera Permission</h3>
+                        <p>When prompted by your browser (Chrome/Safari), make sure to click <strong>"Allow"</strong> or
+                            <strong>"Grant Permission"</strong> to enable the camera.
+                        </p>
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" id="closeErrorModalBtn">I Understand</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="closeErrorModalBtn">I Understand</button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <canvas id="captureCanvas" class="hidden" width="224" height="224"></canvas>
+        <canvas id="captureCanvas" class="hidden" width="224" height="224"></canvas>
+    <?php endif; ?>
 
     <script>
         <?php if ($intern): ?>
@@ -1156,6 +1161,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         <?php endif; ?>
     </script>
+
+    <?php if (!$intern): ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                Swal.fire({
+                    title: <?= json_encode($expiredTitle) ?>,
+                    text: <?= json_encode($expiredText) ?>,
+                    icon: 'error',
+                    confirmButtonColor: 'var(--orange)',
+                    confirmButtonText: 'Understood',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                });
+            });
+        </script>
+    <?php endif; ?>
 </body>
 
 </html>
