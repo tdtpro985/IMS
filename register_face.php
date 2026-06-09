@@ -116,30 +116,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 
-    // Decode and save the first capture as the profile photo
-    $profilePhotoName = null;
-    if (isset($images[0])) {
-        $imgData = base64_decode($images[0]);
-        if ($imgData !== false) {
-            $uploadDir = __DIR__ . '/uploads/photos/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            $profilePhotoName = $intern['id'] . '_' . time() . '.jpg';
-
-            // Delete old photo if it exists
-            $oldRes = $db->query("SELECT profile_photo FROM interns WHERE id = " . $intern['id']);
-            if ($oldRes && $oldRow = $oldRes->fetch_assoc()) {
-                $oldPhoto = $oldRow['profile_photo'];
-                if ($oldPhoto && file_exists($uploadDir . $oldPhoto)) {
-                    @unlink($uploadDir . $oldPhoto);
-                }
-            }
-
-            file_put_contents($uploadDir . $profilePhotoName, $imgData);
-        }
-    }
-
     // Generate unique QR code payload based on ID
     $qrCode = 'TDTINTRN' . $intern['id'];
     $embeddingsJson = json_encode($embeddings);
@@ -149,11 +125,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $stmt = $db->prepare(
         "UPDATE interns 
          SET email = ?, face_embedding = ?, qr_code = ?, face_registered_at = ?, 
-             profile_photo = COALESCE(?, profile_photo),
              registration_token = NULL, token_expires_at = NULL 
          WHERE id = ?"
     );
-    $stmt->bind_param('sssssi', $email, $embeddingsJson, $qrCode, $now, $profilePhotoName, $intern['id']);
+    $stmt->bind_param('ssssi', $email, $embeddingsJson, $qrCode, $now, $intern['id']);
     $success = $stmt->execute();
     $stmt->close();
 
