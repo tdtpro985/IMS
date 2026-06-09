@@ -8,12 +8,14 @@ $intern = null;
 
 if ($token) {
     // Validate token exists and has not expired (24hr TTL)
-    $stmt = $db->prepare("SELECT id, first_name, last_name, email FROM interns WHERE registration_token = ? AND token_expires_at > NOW()");
+    $stmt = $db->prepare("SELECT id, first_name, last_name, email, gender FROM interns WHERE registration_token = ? AND token_expires_at > NOW()");
     $stmt->bind_param('s', $token);
     $stmt->execute();
     $intern = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 }
+
+$genderSuffix = ($intern && ($intern['gender'] ?? '') === 'Female') ? '_f' : '_m';
 
 // Handle AJAX email availability check
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'check_email_availability') {
@@ -1113,7 +1115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             camera.</p>
                         <div class="phone-mockup">
                             <div class="phone-screen">
-                                <img src="assets/img/guide_straight_m.png" alt="Look Straight">
+                                <img src="assets/img/guide_straight<?= $genderSuffix ?>.png" alt="Look Straight">
                             </div>
                         </div>
                     </div>
@@ -1126,7 +1128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             profile.</p>
                         <div class="phone-mockup">
                             <div class="phone-screen">
-                                <img src="assets/img/guide_left_m.png" alt="Turn Left">
+                                <img src="assets/img/guide_left<?= $genderSuffix ?>.png" alt="Turn Left">
                             </div>
                         </div>
                     </div>
@@ -1139,7 +1141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             profile.</p>
                         <div class="phone-mockup">
                             <div class="phone-screen">
-                                <img src="assets/img/guide_right_m.png" alt="Turn Right">
+                                <img src="assets/img/guide_right<?= $genderSuffix ?>.png" alt="Turn Right">
                             </div>
                         </div>
                     </div>
@@ -1151,7 +1153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <p class="tutorial-desc">Tilt your chin and head slightly upwards while facing forward.</p>
                         <div class="phone-mockup">
                             <div class="phone-screen">
-                                <img src="assets/img/guide_up_m.png" alt="Tilt Up">
+                                <img src="assets/img/guide_up<?= $genderSuffix ?>.png" alt="Tilt Up">
                             </div>
                         </div>
                     </div>
