@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $existing = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if ($existing) {
-        echo json_encode(['success' => true, 'available' => false, 'message' => 'This email is already in use by another active intern.']);
+        echo json_encode(['success' => true, 'available' => false, 'message' => 'This email is already registered.']);
     } else {
         echo json_encode(['success' => true, 'available' => true]);
     }
@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $existing = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if ($existing) {
-        echo json_encode(['success' => false, 'error' => 'This email is already registered to another active intern.']);
+        echo json_encode(['success' => false, 'error' => 'This email is already registered.']);
         exit;
     }
 
@@ -713,8 +713,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Email form highlight styles */
@@ -781,9 +788,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         /* Shake animation keyframes */
         @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            10%,
+            30%,
+            50%,
+            70%,
+            90% {
+                transform: translateX(-5px);
+            }
+
+            20%,
+            40%,
+            60%,
+            80% {
+                transform: translateX(5px);
+            }
         }
 
         .shake {
@@ -818,13 +842,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         @keyframes fadeInModal {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
 
         @keyframes slideUpModal {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
         .modal-header {
@@ -902,6 +938,146 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             padding: 16px 20px 20px;
             border-top: 1px solid var(--gray-border);
         }
+
+        /* Onboarding Tutorial Modal & Slider Styles */
+        .modal-skip-btn {
+            position: absolute;
+            top: 16px;
+            right: 18px;
+            background: none;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s;
+            z-index: 10;
+        }
+
+        .modal-skip-btn:hover {
+            color: var(--orange);
+        }
+
+        .tutorial-slider {
+            position: relative;
+            min-height: 270px;
+            margin-top: 10px;
+        }
+
+        .tutorial-slide {
+            display: none;
+            animation: tutFadeIn 0.3s ease;
+        }
+
+        .tutorial-slide.active {
+            display: block;
+        }
+
+        .tutorial-step-tag {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--orange);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .tutorial-title {
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: var(--text-main);
+        }
+
+        .tutorial-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.4;
+            min-height: 34px;
+            margin: 0;
+            padding: 0 8px;
+        }
+
+        .phone-mockup {
+            width: 110px;
+            height: 170px;
+            border: 4.5px solid #2a2b2e;
+            border-radius: 18px;
+            position: relative;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+            background: #fff;
+            overflow: hidden;
+            margin: 15px auto 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .phone-mockup::before {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 26px;
+            height: 3px;
+            background: #2a2b2e;
+            border-radius: 1.5px;
+            z-index: 2;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: #f4f5f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .phone-screen img {
+            width: 85%;
+            height: 85%;
+            object-fit: contain;
+        }
+
+        .tutorial-dots {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .tut-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--gray-border);
+            transition: background 0.2s, transform 0.2s;
+            cursor: pointer;
+        }
+
+        .tut-dot.active {
+            background: var(--orange);
+            transform: scale(1.15);
+        }
+
+        @keyframes tutFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #tutorialModal:not(.open) {
+            display: none !important;
+        }
     </style>
 </head>
 
@@ -912,6 +1088,96 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         <div class="loader-spinner"></div>
         <div style="font-weight: 600; font-size: 15px;">Initializing Face Camera...</div>
         <div style="font-size: 12px; color: rgba(255, 255, 255, 0.65);">Downloading neural network model files (~6.6MB)
+        </div>
+    </div>
+
+    <!-- Onboarding Tutorial Modal -->
+    <div class="modal-overlay" id="tutorialModal">
+        <div class="modal-card"
+            style="max-width: 400px; width: 92%; box-sizing: border-box; overflow: hidden; margin: 10px; position: relative;">
+
+            <!-- Skip Button -->
+            <button type="button" class="modal-skip-btn" id="skipTutorialBtn">Skip</button>
+
+            <!-- Scrollable Content Body -->
+            <div class="modal-body"
+                style="padding: 24px 20px 10px; text-align: center; overflow-y: visible; max-height: none;">
+                <!-- Slider Container -->
+                <div class="tutorial-slider">
+
+                    <!-- Slide 1: Look Straight -->
+                    <div class="tutorial-slide active" data-slide="0">
+                        <div class="tutorial-step-tag">Step 1 of 4</div>
+                        <h3 class="tutorial-title">Look Straight</h3>
+                        <p class="tutorial-desc">Align your face in the center of the frame and look directly at the
+                            camera.</p>
+                        <div class="phone-mockup">
+                            <div class="phone-screen">
+                                <img src="assets/img/guide_straight_m.png" alt="Look Straight">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Slide 2: Turn Left -->
+                    <div class="tutorial-slide" data-slide="1">
+                        <div class="tutorial-step-tag">Step 2 of 4</div>
+                        <h3 class="tutorial-title">Turn Left</h3>
+                        <p class="tutorial-desc">Rotate your head slightly to the left side so the camera captures your
+                            profile.</p>
+                        <div class="phone-mockup">
+                            <div class="phone-screen">
+                                <img src="assets/img/guide_left_m.png" alt="Turn Left">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Slide 3: Turn Right -->
+                    <div class="tutorial-slide" data-slide="2">
+                        <div class="tutorial-step-tag">Step 3 of 4</div>
+                        <h3 class="tutorial-title">Turn Right</h3>
+                        <p class="tutorial-desc">Rotate your head slightly to the right side to capture your opposite
+                            profile.</p>
+                        <div class="phone-mockup">
+                            <div class="phone-screen">
+                                <img src="assets/img/guide_right_m.png" alt="Turn Right">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Slide 4: Tilt Up -->
+                    <div class="tutorial-slide" data-slide="3">
+                        <div class="tutorial-step-tag">Step 4 of 4</div>
+                        <h3 class="tutorial-title">Tilt Up</h3>
+                        <p class="tutorial-desc">Tilt your chin and head slightly upwards while facing forward.</p>
+                        <div class="phone-mockup">
+                            <div class="phone-screen">
+                                <img src="assets/img/guide_up_m.png" alt="Tilt Up">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Fixed Footer -->
+            <div class="modal-footer"
+                style="padding: 12px 20px 20px; text-align: center; background: var(--white); display: flex; flex-direction: column; gap: 12px;">
+                <!-- Indicators -->
+                <div class="tutorial-dots" id="tutorialDots" style="margin-top: 0; justify-content: center;">
+                    <div class="tut-dot active" data-index="0"></div>
+                    <div class="tut-dot" data-index="1"></div>
+                    <div class="tut-dot" data-index="2"></div>
+                    <div class="tut-dot" data-index="3"></div>
+                </div>
+
+                <!-- Action button -->
+                <div>
+                    <button type="button" class="btn btn-primary w-100" id="tutNextBtn"
+                        style="justify-content: center; padding: 12px 16px;">
+                        Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -945,21 +1211,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                 <!-- Email confirmation -->
                 <div id="emailSection" style="display: flex; flex-direction: column; gap: 20px;">
-                    <div class="info-toggle-container">
-                        <button type="button" class="info-toggle-btn" id="infoToggleBtn">
-                            <i class="fas fa-question-circle" style="font-size: 16px;"></i> Why do we register face &amp; QR?
-                        </button>
-                        <div class="info-toggle-content hidden" id="infoToggleContent">
-                            TDT Powersteel uses a touchless biometric Kiosk to track daily time and attendance (DTR) for
-                            Interns. To get started, you need to register your face profile and generate your personal QR code.
-                            When arriving at or leaving the office, you will scan this QR code and look at the kiosk camera to
-                            verify your identity and log your hours instantly.
-                        </div>
-                    </div>
-
                     <div class="form-group-highlight" id="emailFormGroup">
                         <label class="form-label">
-                            <i class="fas fa-envelope-open-text" style="color: var(--orange); margin-right: 4px;"></i> Email Address <span style="color: var(--danger); font-size: 14px;">*</span>
+                            <i class="fas fa-envelope-open-text" style="color: var(--orange); margin-right: 4px;"></i> Email
+                            Address <span style="color: var(--danger); font-size: 14px;">*</span>
                         </label>
                         <input type="email" id="internEmail" class="form-control"
                             placeholder="Enter your active email address"
@@ -969,6 +1224,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             sure to use an active, real email address that you have access to. Your personalized QR code
                             will be sent here immediately, which you will need along with your face scan to clock in and
                             out.</p>
+                    </div>
+
+                    <div class="info-toggle-container">
+                        <button type="button" class="info-toggle-btn" id="infoToggleBtn">
+                            <i class="fas fa-question-circle" style="font-size: 16px;"></i> Why do we need to register?
+                        </button>
+                        <div class="info-toggle-content hidden" id="infoToggleContent">
+                            TDT Powersteel uses a touchless biometric Kiosk to track daily time and attendance (DTR) for
+                            Interns. To get started, you need to register your face profile and generate your personal QR
+                            code.
+                            When arriving at or leaving the office, you will scan this QR code and look at the kiosk camera
+                            to
+                            verify your identity and log your hours instantly.
+                        </div>
                     </div>
 
                     <button type="button" class="btn btn-primary" id="startCaptureBtn">
@@ -1014,7 +1283,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div id="submittingState" class="status-card hidden">
                     <div class="status-icon"><i class="fas fa-spinner fa-spin" style="color: var(--orange);"></i></div>
                     <div class="status-title">Analyzing Face Profiles</div>
-                    <div class="status-text">Analyzing your captured photos and securing your Face ID profile. Please do not close this window.</div>
+                    <div class="status-text">Analyzing your captured photos and securing your Face ID profile. Please do not
+                        close this window.</div>
                 </div>
             </div>
 
@@ -1059,21 +1329,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <h2>Camera Access Required</h2>
             </div>
             <div class="modal-body">
-                <p class="modal-intro">We couldn't access your camera. This is usually due to browser permissions or restriction settings.</p>
-                
+                <p class="modal-intro">We couldn't access your camera. This is usually due to browser permissions or
+                    restriction settings.</p>
+
                 <div class="help-section">
                     <h3><i class="fab fa-facebook-messenger"></i> Using Messenger/Viber?</h3>
-                    <p>In-app browsers (like Facebook Messenger or Viber) block camera access. Tap the <strong>three dots (...)</strong> or the <strong>Share</strong> icon in the top right, then select <strong>"Open in Chrome"</strong> or <strong>"Open in Safari"</strong>.</p>
+                    <p>In-app browsers (like Facebook Messenger or Viber) block camera access. Tap the <strong>three
+                            dots (...)</strong> or the <strong>Share</strong> icon in the top right, then select
+                        <strong>"Open in Chrome"</strong> or <strong>"Open in Safari"</strong>.
+                    </p>
                 </div>
 
                 <div class="help-section">
                     <h3><i class="fas fa-mobile-alt"></i> Enforce Phone Usage</h3>
-                    <p>We highly recommend using a <strong>smartphone</strong> rather than a laptop. Mobile front-facing cameras have significantly higher quality, better autofocus, and auto-exposure, leading to a much faster and more accurate face scan.</p>
+                    <p>We highly recommend using a <strong>smartphone</strong> rather than a laptop. Mobile front-facing
+                        cameras have significantly higher quality, better autofocus, and auto-exposure, leading to a
+                        much faster and more accurate face scan.</p>
                 </div>
 
                 <div class="help-section">
                     <h3><i class="fas fa-user-shield"></i> Grant Camera Permission</h3>
-                    <p>When prompted by your browser (Chrome/Safari), make sure to click <strong>"Allow"</strong> or <strong>"Grant Permission"</strong> to enable the camera.</p>
+                    <p>When prompted by your browser (Chrome/Safari), make sure to click <strong>"Allow"</strong> or
+                        <strong>"Grant Permission"</strong> to enable the camera.
+                    </p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1347,7 +1625,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 lastCaptureTime = Date.now();
                 playShutterSound();
                 triggerScreenFlash();
-                
+
                 // Capture first frontal frame (cropping center square to prevent distortion)
                 const vWidth1 = webcam.videoWidth;
                 const vHeight1 = webcam.videoHeight;
@@ -1434,6 +1712,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             let currentStep = 0;
             const capturedImages = [];
 
+            // Tutorial Modal Controller
+            const tutorialModal = document.getElementById('tutorialModal');
+            const skipTutorialBtn = document.getElementById('skipTutorialBtn');
+            const tutNextBtn = document.getElementById('tutNextBtn');
+            const tutSlides = document.querySelectorAll('.tutorial-slide');
+            const tutDots = document.querySelectorAll('.tut-dot');
+            let currentTutSlide = 0;
+
+            function showSlide(index) {
+                tutSlides.forEach((slide, idx) => {
+                    if (idx === index) {
+                        slide.classList.add('active');
+                    } else {
+                        slide.classList.remove('active');
+                    }
+                });
+                tutDots.forEach((dot, idx) => {
+                    if (idx === index) {
+                        dot.classList.add('active');
+                    } else {
+                        dot.classList.remove('active');
+                    }
+                });
+                currentTutSlide = index;
+
+                if (currentTutSlide === tutSlides.length - 1) {
+                    tutNextBtn.innerHTML = 'I\'m Ready! <i class="fas fa-camera" style="margin-left: 6px;"></i>';
+                } else {
+                    tutNextBtn.innerHTML = 'Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i>';
+                }
+            }
+
+            tutNextBtn.addEventListener('click', () => {
+                if (currentTutSlide < tutSlides.length - 1) {
+                    showSlide(currentTutSlide + 1);
+                } else {
+                    closeTutorialAndStartCamera();
+                }
+            });
+
+            tutDots.forEach((dot, idx) => {
+                dot.addEventListener('click', () => {
+                    showSlide(idx);
+                });
+            });
+
+            skipTutorialBtn.addEventListener('click', () => {
+                closeTutorialAndStartCamera();
+            });
+
+            async function closeTutorialAndStartCamera() {
+                tutorialModal.classList.remove('open');
+
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'user',
+                            width: { ideal: 640 },
+                            height: { ideal: 480 }
+                        },
+                        audio: false
+                    });
+                    webcam.srcObject = stream;
+                    webcam.onloadedmetadata = () => {
+                        runDetectionLoop();
+                    };
+
+                    emailSection.classList.add('hidden');
+                    cameraSection.classList.remove('hidden');
+                    cameraBox.classList.add('active');
+                    scanningRing.style.display = 'block';
+
+                    currentStep = 0;
+                    capturedImages.length = 0;
+                    updateStepUI();
+                } catch (err) {
+                    console.error(err);
+                    const modal = document.getElementById('cameraErrorModal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                    }
+                }
+            }
+
             const steps = [
                 { title: "Look Straight", desc: "Position your face in the center circle and look directly at the camera." },
                 { title: "Turn Left", desc: "Slightly rotate your face horizontally to the left." },
@@ -1492,7 +1854,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         body: checkData
                     });
                     const data = await res.json();
-                    
+
                     if (!data.success || !data.available) {
                         if (emailError && emailFormGroup) {
                             emailError.innerText = data.message || data.error || 'This email is already registered.';
@@ -1510,35 +1872,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     startCaptureBtn.innerHTML = 'Next: Camera Capture <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>';
                 }
 
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: 'user',
-                            width: { ideal: 640 },
-                            height: { ideal: 480 }
-                        },
-                        audio: false
-                    });
-                    webcam.srcObject = stream;
-                    webcam.onloadedmetadata = () => {
-                        runDetectionLoop();
-                    };
-
-                    emailSection.classList.add('hidden');
-                    cameraSection.classList.remove('hidden');
-                    cameraBox.classList.add('active');
-                    scanningRing.style.display = 'block';
-
-                    currentStep = 0;
-                    capturedImages.length = 0;
-                    updateStepUI();
-                } catch (err) {
-                    console.error(err);
-                    const modal = document.getElementById('cameraErrorModal');
-                    if (modal) {
-                        modal.classList.remove('hidden');
-                    }
-                }
+                tutorialModal.classList.add('open');
+                showSlide(0);
             });
 
             cancelCameraBtn.addEventListener('click', stopCamera);
