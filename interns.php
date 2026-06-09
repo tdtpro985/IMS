@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($action === 'generate_link') {
                 // Generate secure 32-character hex token (16 bytes)
                 $token = bin2hex(random_bytes(16));
-                $expiresAt = date('Y-m-d H:i:s', strtotime('+72 hours'));
+                $expiresAt = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
                 $stmt = $db->prepare("UPDATE interns SET registration_token = ?, token_expires_at = ? WHERE id = ?");
                 $stmt->bind_param('ssi', $token, $expiresAt, $internId);
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($action === 're_register') {
                 // Wipe embedding and generate new token
                 $token = bin2hex(random_bytes(16));
-                $expiresAt = date('Y-m-d H:i:s', strtotime('+72 hours'));
+                $expiresAt = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
                 $stmt = $db->prepare("UPDATE interns SET face_embedding = NULL, face_registered_at = NULL, registration_token = ?, token_expires_at = ? WHERE id = ?");
                 $stmt->bind_param('ssi', $token, $expiresAt, $internId);
@@ -232,7 +232,7 @@ require_once __DIR__ . '/includes/header.php';
                                 </button>
                             <?php else: ?>
                                 <?php if ($isTokenActive): ?>
-                                    <button class="btn btn-icon btn-sm" title="Copy Registration Link" onclick="copyLink('<?= (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/register?token=' . $intern['registration_token'] ?>')">
+                                    <button class="btn btn-icon btn-sm" title="Copy Registration Link" onclick="copyLink('<?= (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/register?token=' . $intern['registration_token'] ?>', '<?= htmlspecialchars($intern['first_name'], ENT_QUOTES) ?>')">
                                         <i class="fas fa-copy" style="color: #3B82F6;"></i>
                                     </button>
                                     <button class="btn btn-icon btn-sm" title="Re-generate Link" onclick="generateLink(<?= $intern['id'] ?>, '<?= htmlspecialchars($intern['first_name'].' '.$intern['last_name'], ENT_QUOTES) ?>')">
@@ -318,11 +318,14 @@ function printQR() {
     }, 500);
 }
 
-function copyLink(link) {
-    navigator.clipboard.writeText(link).then(function() {
-        showToast('Registration link copied to clipboard!', 'success');
+function copyLink(link, name) {
+    name = name || 'there';
+    const text = `Hello ${name}! Here is your Face ID registration link for the TDT Powersteel Intern Management System:\n\n${link}\n\nNote: This link is secure and will expire in 24 hours. Please open it on your smartphone to complete the registration. Thank you!`;
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('Registration message copied!', 'success');
     }).catch(function(err) {
-        showToast('Failed to copy link.', 'error');
+        navigator.clipboard.writeText(link);
+        showToast('Registration link copied!', 'success');
     });
 }
 
@@ -354,16 +357,12 @@ function generateLink(id, name) {
                               '<input type="text" id="regLinkInput" class="form-control" readonly value="' + data.url + '" style="text-align:center; font-weight:500; border-color:var(--orange)">',
                         icon: 'success',
                         confirmButtonColor: '#FF6B1A',
-                        confirmButtonText: 'Copy Link',
+                        confirmButtonText: 'Copy Link & Close',
                         showCloseButton: true
                     }).then((r) => {
-                        // Automatically copy on confirm
-                        const input = document.getElementById('regLinkInput');
-                        input.select();
-                        input.setSelectionRange(0, 99999);
-                        navigator.clipboard.writeText(data.url);
-                        showToast('Registration link copied!', 'success');
-                        setTimeout(() => location.reload(), 800);
+                        const firstName = name ? name.split(' ')[0] : '';
+                        copyLink(data.url, firstName);
+                        setTimeout(() => location.reload(), 1200);
                     });
                 } else {
                     Swal.fire('Error', data.error || 'Failed to generate link.', 'error');
@@ -379,7 +378,7 @@ function generateLink(id, name) {
 function reRegister(id, name) {
     Swal.fire({
         title: 'Re-register Face ID',
-        text: 'This will wipe the current face embedding for ' + name + ' and generate a new 72-hour registration link. The existing QR code will remain valid. Continue?',
+        text: 'This will wipe the current face embedding for ' + name + ' and generate a new 24-hour registration link. The existing QR code will remain valid. Continue?',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#EF4444',
@@ -404,15 +403,12 @@ function reRegister(id, name) {
                               '<input type="text" id="regLinkInput" class="form-control" readonly value="' + data.url + '" style="text-align:center; font-weight:500; border-color:var(--orange)">',
                         icon: 'success',
                         confirmButtonColor: '#FF6B1A',
-                        confirmButtonText: 'Copy Link',
+                        confirmButtonText: 'Copy Link & Close',
                         showCloseButton: true
                     }).then((r) => {
-                        const input = document.getElementById('regLinkInput');
-                        input.select();
-                        input.setSelectionRange(0, 99999);
-                        navigator.clipboard.writeText(data.url);
-                        showToast('New registration link copied!', 'success');
-                        setTimeout(() => location.reload(), 800);
+                        const firstName = name ? name.split(' ')[0] : '';
+                        copyLink(data.url, firstName);
+                        setTimeout(() => location.reload(), 1200);
                     });
                 } else {
                     Swal.fire('Error', data.error || 'Failed to re-register.', 'error');

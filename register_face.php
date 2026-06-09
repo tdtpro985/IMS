@@ -7,7 +7,7 @@ $token = trim($_GET['token'] ?? $_POST['token'] ?? '');
 $intern = null;
 
 if ($token) {
-    // Validate token exists and has not expired (72hr TTL)
+    // Validate token exists and has not expired (24hr TTL)
     $stmt = $db->prepare("SELECT id, first_name, last_name, email FROM interns WHERE registration_token = ? AND token_expires_at > NOW()");
     $stmt->bind_param('s', $token);
     $stmt->execute();

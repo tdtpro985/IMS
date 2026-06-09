@@ -150,3 +150,20 @@ Starts with "LOGID:"   Starts with "TDTINTRN"    No match
 - **Clock In**: Check if `dtr_entries` row exists for today. If not → `INSERT` new row with `time_in`. If already clocked in → return error "Already clocked in today."
 - **Clock Out**: Find today's entry with `time_in` set and `time_out` NULL → `UPDATE` with `time_out`. `rendered_hours` auto-calculated by MySQL generated column.
 - Returns: success/error status with rendered hours for display on kiosk.
+
+---
+
+## 7. Security & Operational Recommendations
+
+### 7.1 Time-Falsification Prevention
+* **Risk:** The API endpoint `record_intern_attendance.php` accepts client-provided time and date fields. While needed for Kiosk offline queuing, for active online requests it introduces clock-tampering risks.
+* **Mitigation:** Modify the PHP backend to ignore the client clock for online requests and use the server's timezone-aware clock (`date('H:i:s')` under `Asia/Manila` configured in `config/db.php`) to log entries.
+
+### 7.2 Camera HTTPS Requirement in Local Deployments
+* **Risk:** Web browsers block front-facing cameras on insecure `http://` sites.
+* **Mitigation:** Ensure the Webmin host local server configures SSL certs (e.g. Let's Encrypt or a local Root CA certificate) so mobile phones opening the registration page can register successfully.
+
+### 7.3 Offline Redundancy Support for Interns
+* **Risk:** If the local PHP server network fails, interns cannot verify their faces or clock in.
+* **Mitigation:** Expand the Kiosk app's sync worker to fetch active intern face vectors into a local cache database periodically, enabling offline verification and queuing for interns.
+
