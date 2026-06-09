@@ -1157,22 +1157,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 requestAnimationFrame(runDetectionLoop);
             }
 
+            let initialFaceSize = null;
+            let lastCaptureTime = 0;
+            const CAPTURE_COOLDOWN_MS = 1500;
+            let overrideTimer = null;
+            let poseStableStartTime = null;
+            const STABLE_DURATION_MS = 800;
+            let faceIsPresent = false;
+
+            function updateManualBtnState() {
+                const manualBtn = document.getElementById('manualOverrideBtn');
+                if (manualBtn) {
+                    if (faceIsPresent) {
+                        manualBtn.removeAttribute('disabled');
+                        manualBtn.style.opacity = "1";
+                        manualBtn.style.cursor = "pointer";
+                    } else {
+                        manualBtn.setAttribute('disabled', 'true');
+                        manualBtn.style.opacity = "0.5";
+                        manualBtn.style.cursor = "not-allowed";
+                    }
+                }
+            }
+
             function processLandmarkResults(results) {
                 faceWarningMessage.innerText = "";
                 guideCircle.className.baseVal = "guide-circle";
+                guideCircle.style.stroke = "";
 
                 if (!results || !results.faceLandmarks || results.faceLandmarks.length === 0) {
                     faceWarningMessage.innerText = "No face detected. Align your face in the circle.";
                     guideCircle.className.baseVal = "guide-circle error-state";
+                    faceIsPresent = false;
+                    poseStableStartTime = null;
+                    updateManualBtnState();
                     return;
                 }
 
                 if (results.faceLandmarks.length > 1) {
                     faceWarningMessage.innerText = "Multiple faces detected. Keep only one person in frame.";
                     guideCircle.className.baseVal = "guide-circle error-state";
+                    faceIsPresent = false;
+                    poseStableStartTime = null;
+                    updateManualBtnState();
                     return;
                 }
 
+                faceIsPresent = true;
+                updateManualBtnState();
                 guideCircle.className.baseVal = "guide-circle aligned";
 
                 if (results.facialTransformationMatrixes && results.facialTransformationMatrixes.length > 0) {
@@ -1186,13 +1218,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         const width = Math.abs(landmarks[263].x - landmarks[33].x);
                         processCaptureAngles(yaw, pitch, width);
                     }
+                } else {
+                    poseStableStartTime = null;
                 }
             }
-
-            let initialFaceSize = null;
-            let lastCaptureTime = 0;
-            const CAPTURE_COOLDOWN_MS = 1500;
-            let overrideTimer = null;
 
             function playShutterSound() {
                 try {
@@ -1262,6 +1291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     if (cancelCameraBtn && cancelCameraBtn.parentNode) {
                         cancelCameraBtn.parentNode.insertBefore(btn, cancelCameraBtn);
                     }
+                    updateManualBtnState();
                 }, 10000);
             }
 
@@ -1277,6 +1307,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
 
             function captureAutoAngle() {
+                if (!faceIsPresent) {
+                    faceWarningMessage.innerText = "Cannot capture: No face detected in frame. Align your face.";
+                    return;
+                }
                 lastCaptureTime = Date.now();
                 playShutterSound();
                 triggerScreenFlash();
@@ -1295,11 +1329,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
 
             function processCaptureAngles(yaw, pitch, faceWidth) {
-                if (Date.now() - lastCaptureTime < CAPTURE_COOLDOWN_MS) return;
+                if (Date.now() - lastCaptureTime < CAPTURE_COOLDOWN_MS) {
+                    poseStableStartTime = null;
+                    return;
+                }
                 let matched = false;
                 if (currentStep === 0) {
                     if (Math.abs(yaw) <= 15 && Math.abs(pitch) <= 15) {
-                        initialFaceSize = faceWidth;
                         matched = true;
                     }
                 } else if (currentStep === 1) {
@@ -1321,8 +1357,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         matched = true;
                     }
                 }
+
                 if (matched) {
-                    captureAutoAngle();
+                    guideCircle.style.stroke = "var(--success)";
+                    captureInstructions.innerHTML = steps[currentStep].title + " — <strong>Hold still...</strong>";
+
+                    if (poseStableStartTime === null) {
+                        poseStableStartTime = Date.now();
+                    } else if (Date.now() - poseStableStartTime >= STABLE_DURATION_MS) {
+                        poseStableStartTime = null;
+                        if (currentStep === 0) {
+                            initialFaceSize = faceWidth;
+                        }
+                        captureAutoAngle();
+                    }
+                } else {
+                    poseStableStartTime = null;
                 }
             }
 
@@ -1454,7 +1504,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     formData.append(`images[${idx}]`, img);
                 });
 
-                fetch('register', {
+                fetch('register_face.php', {
                     method: 'POST',
                     body: formData
                 })
