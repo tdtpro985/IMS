@@ -190,6 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- MediaPipe Face Landmarker loaded dynamically in script -->
     <link rel="stylesheet" href="assets/css/register_intern.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -205,8 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <div class="modal-overlay" id="tutorialModal">
         <div class="modal-card">
 
-            <!-- Skip Button -->
-            <button type="button" class="modal-skip-btn" id="skipTutorialBtn">Skip</button>
+
 
             <!-- Scrollable Content Body -->
             <div class="modal-body">
@@ -288,11 +288,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <div class="tut-dot" data-index="3"></div>
                 </div>
 
-                <!-- Action button -->
-                <div>
+                <!-- Action button & Skip -->
+                <div class="modal-footer-actions">
                     <button type="button" class="btn btn-primary w-100" id="tutNextBtn">
                         Next <i class="fas fa-arrow-right ml-6"></i>
                     </button>
+                    <button type="button" class="modal-skip-btn" id="skipTutorialBtn">Skip Tutorial</button>
                 </div>
             </div>
         </div>
@@ -355,16 +356,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     </div>
 
                     <button type="button" class="btn btn-primary" id="startCaptureBtn">
-                        Proceed to Camera <i class="fas fa-arrow-right ml-4"></i>
+                        Proceed <i class="fas fa-arrow-right ml-4"></i>
                     </button>
                 </div>
 
                 <!-- Camera section -->
                 <div id="cameraSection" class="hidden">
-                    <div class="capture-title" id="captureTitle">
-                        Step 1: Look Straight
-                    </div>
-
                     <div class="camera-box" id="cameraBox">
                         <video id="webcam" autoplay playsinline></video>
                         <div class="scanning-ring" id="scanningRing"></div>
@@ -387,6 +384,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="step-dot" id="dot-3"></div>
                     </div>
 
+                    <div class="capture-title" id="captureTitle">
+                        Step 1: Look Straight
+                    </div>
+
                     <div class="capture-instructions" id="captureInstructions">
                         Click Start Capture to begin face registration
                     </div>
@@ -399,7 +400,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                     <div class="camera-actions">
                         <button type="button" class="btn btn-primary hidden" id="captureBtn">Capture Angle</button>
-                        <button type="button" class="btn btn-secondary" id="cancelCameraBtn">Back</button>
                     </div>
                 </div>
 
@@ -523,7 +523,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             const emailSection = document.getElementById('emailSection');
             const cameraSection = document.getElementById('cameraSection');
             const startCaptureBtn = document.getElementById('startCaptureBtn');
-            const cancelCameraBtn = document.getElementById('cancelCameraBtn');
             const captureBtn = document.getElementById('captureBtn');
             const internEmail = document.getElementById('internEmail');
             const webcam = document.getElementById('webcam');
@@ -604,12 +603,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 if (manualBtn) {
                     if (faceIsPresent) {
                         manualBtn.removeAttribute('disabled');
-                        manualBtn.style.opacity = "1";
-                        manualBtn.style.cursor = "pointer";
                     } else {
                         manualBtn.setAttribute('disabled', 'true');
-                        manualBtn.style.opacity = "0.5";
-                        manualBtn.style.cursor = "not-allowed";
                     }
                 }
             }
@@ -617,7 +612,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             function processLandmarkResults(results) {
                 faceWarningMessage.innerText = "";
                 guideCircle.className.baseVal = "guide-circle";
-                guideCircle.style.stroke = "";
 
                 if (!results || !results.faceLandmarks || results.faceLandmarks.length === 0) {
                     faceWarningMessage.innerText = "No face detected. Align your face in the circle.";
@@ -721,9 +715,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     btn.id = 'manualOverrideBtn';
                     btn.className = 'btn btn-override';
                     btn.innerText = 'Capture Manually (Stuck)';
-                    btn.addEventListener('click', captureAutoAngle);
-                    if (cancelCameraBtn && cancelCameraBtn.parentNode) {
-                        cancelCameraBtn.parentNode.insertBefore(btn, cancelCameraBtn);
+                    btn.addEventListener('click', confirmManualCapture);
+                    const container = document.querySelector('.camera-actions');
+                    if (container) {
+                        container.appendChild(btn);
                     }
                     updateManualBtnState();
                 }, 10000);
@@ -738,6 +733,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 if (btn) {
                     btn.remove();
                 }
+            }
+
+            function confirmManualCapture() {
+                if (!faceIsPresent) {
+                    faceWarningMessage.innerText = "Cannot capture: No face detected in frame. Align your face.";
+                    return;
+                }
+
+                Swal.fire({
+                    title: 'Manual Capture Warning',
+                    html: `Please rotate or tilt your face according to the active step before capturing:<br><br><strong class="swal-step-title">${steps[currentStep].title}</strong><br><span class="swal-step-desc">${steps[currentStep].desc}</span>`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: 'var(--orange)',
+                    cancelButtonColor: '#8a8b8d',
+                    confirmButtonText: 'Yes, Capture Angle',
+                    cancelButtonText: 'Cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        captureAutoAngle();
+                    }
+                });
             }
 
             function captureAutoAngle() {
@@ -817,7 +834,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
 
                 if (matched) {
-                    guideCircle.style.stroke = "var(--success)";
+                    guideCircle.className.baseVal = "guide-circle captured";
                     captureInstructions.innerHTML = "<strong>Hold still...</strong>";
 
                     if (poseStableStartTime === null) {
@@ -937,7 +954,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     emailSection.classList.add('hidden');
                     cameraSection.classList.remove('hidden');
                     cameraBox.classList.add('active');
-                    scanningRing.style.display = 'block';
+                    scanningRing.classList.add('active');
 
                     currentStep = 0;
                     capturedImages.length = 0;
@@ -1031,9 +1048,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 setTimeout(() => showSlide(0, false), 50);
             });
 
-            cancelCameraBtn.addEventListener('click', stopCamera);
-
-            captureBtn.addEventListener('click', captureAutoAngle);
+            captureBtn.addEventListener('click', confirmManualCapture);
 
             function updateStepUI() {
                 dots.forEach((dot, idx) => {
@@ -1062,7 +1077,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 cameraSection.classList.add('hidden');
                 emailSection.classList.remove('hidden');
                 cameraBox.classList.remove('active');
-                scanningRing.style.display = 'none';
+                scanningRing.classList.remove('active');
             }
 
             function validateEmail(email) {
