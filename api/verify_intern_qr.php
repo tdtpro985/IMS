@@ -13,18 +13,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../config/db.php';
 $db = getDB();
 
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-if ($id <= 0) {
+$idParam = isset($_GET['id']) ? trim((string)$_GET['id']) : '';
+if ($idParam === '') {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'message' => 'Invalid intern ID']);
+    echo json_encode(['ok' => false, 'message' => 'Invalid intern ID or QR']);
     exit;
 }
 
-$stmt = $db->prepare("SELECT id, first_name, last_name, profile_photo, face_embedding FROM interns WHERE id = ? AND status = 'Active'");
-$stmt->bind_param('i', $id);
+$intern = null;
+
+// 1. Try lookup by qr_code = "TDTINTRN" + $idParam
+$fullQr = 'TDTINTRN' . $idParam;
+$stmt = $db->prepare("SELECT id, first_name, last_name, profile_photo, face_embedding FROM interns WHERE qr_code = ? AND status = 'Active'");
+$stmt->bind_param('s', $fullQr);
 $stmt->execute();
 $intern = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+
+// 2. Try lookup by exact qr_code = $idParam
+if (!$intern) {
+    $stmt = $db->prepare("SELECT id, first_name, last_name, profile_photo, face_embedding FROM interns WHERE qr_code = ? AND status = 'Active'");
+    $stmt->bind_param('s', $idParam);
+    $stmt->execute();
+    $intern = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+}
+
+// 3. Fallback to numeric id lookup
+if (!$intern && is_numeric($idParam)) {
+    $numericId = (int)$idParam;
+    if ($numericId > 0) {
+        $stmt = $db->prepare("SELECT id, first_name, last_name, profile_photo, face_embedding FROM interns WHERE id = ? AND status = 'Active'");
+        $stmt->bind_param('i', $numericId);
+        $stmt->execute();
+        $intern = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+    }
+}
 
 if (!$intern) {
     http_response_code(404);

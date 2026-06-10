@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Manila');
 // API endpoint for kiosk to record intern clock-in / clock-out.
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -52,70 +53,34 @@ if (!$intern) {
 
 $name = $intern['first_name'] . ' ' . $intern['last_name'];
 
-// Check today's entry
-$stmt = $db->prepare("SELECT id, time_in, time_out, entry_source FROM dtr_entries WHERE intern_id = ? AND entry_date = ? AND is_archived = 0");
-$stmt->bind_param('is', $internId, $date);
-$stmt->execute();
-$entry = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+// Check for any manual entry today (HR override takes precedence)
+$manualStmt = $db->prepare("SELECT id FROM dtr_entries WHERE intern_id = ? AND entry_date = ? AND entry_source = 'manual' AND is_archived = 0 LIMIT 1");
+$manualStmt->bind_param('is', $internId, $date);
+$manualStmt->execute();
+$hasManual = $manualStmt->get_result()->fetch_assoc();
+$manualStmt->close();
 
-if ($entry) {
-    if ($entry['entry_source'] === 'manual') {
-        // Skip over manual entries (HR entries override kiosk)
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'message' => 'Manual DTR entry already exists for today']);
-        exit;
-    }
+if ($hasManual) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'message' => 'Manual DTR entry already exists for today']);
+    exit;
+}
 
-    if ($action === 'clock_in') {
+if ($action === 'clock_in') {
+    // Check if there is an open session today (where time_out IS NULL)
+    $stmt = $db->prepare("SELECT id FROM dtr_entries WHERE intern_id = ? AND entry_date = ? AND time_out IS NULL AND is_archived = 0 LIMIT 1");
+    $stmt->bind_param('is', $internId, $date);
+    $stmt->execute();
+    $openSession = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($openSession) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'message' => 'Already clocked in today']);
         exit;
     }
 
-    // clock_out
-    if ($entry['time_out']) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'message' => 'Already clocked out today']);
-        exit;
-    }
-
-    // Update existing clock_in entry with time_out
-    $stmt = $db->prepare("UPDATE dtr_entries SET time_out = ? WHERE id = ?");
-    $stmt->bind_param('si', $time, $entry['id']);
-    $success = $stmt->execute();
-    $stmt->close();
-
-    if ($success) {
-        // Recalculate rendered hours
-        $db->query("UPDATE interns SET rendered_hours = (SELECT COALESCE(SUM(rendered_hours),0) FROM dtr_entries WHERE intern_id = {$internId} AND is_archived = 0) WHERE id = {$internId}");
-        
-        // Fetch newly calculated hours for this entry
-        $hRes = $db->query("SELECT rendered_hours FROM dtr_entries WHERE id = " . $entry['id']);
-        $hours = $hRes ? $hRes->fetch_row()[0] : 0;
-
-        logAudit('UPDATE', 'DTR', $entry['id'], "Intern {$name} clocked out via kiosk at {$time} on {$date}. Rendered: {$hours} hrs.");
-
-        echo json_encode([
-            'ok' => true,
-            'message' => 'Clock out successful',
-            'time_in' => $entry['time_in'],
-            'time_out' => $time,
-            'rendered_hours' => (float)$hours
-        ]);
-    } else {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'message' => 'Failed to save DTR data']);
-    }
-} else {
-    // No entry exists
-    if ($action === 'clock_out') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'message' => 'No clock in entry found for today']);
-        exit;
-    }
-
-    // clock_in
+    // Create a new clock_in session
     $stmt = $db->prepare("INSERT INTO dtr_entries (intern_id, entry_date, time_in, entry_source) VALUES (?, ?, ?, 'kiosk')");
     $stmt->bind_param('iss', $internId, $date, $time);
     $success = $stmt->execute();
@@ -136,4 +101,60 @@ if ($entry) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'message' => 'Failed to save DTR data']);
     }
+    exit;
+} else if ($action === 'clock_out') {
+    // Find the most recent open session today (where time_out IS NULL)
+    $stmt = $db->prepare("SELECT id, time_in FROM dtr_entries WHERE intern_id = ? AND entry_date = ? AND time_out IS NULL AND is_archived = 0 ORDER BY id DESC LIMIT 1");
+    $stmt->bind_param('is', $internId, $date);
+    $stmt->execute();
+    $openSession = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($openSession) {
+        // Update the open session with time_out
+        $stmt = $db->prepare("UPDATE dtr_entries SET time_out = ? WHERE id = ?");
+        $stmt->bind_param('si', $time, $openSession['id']);
+        $success = $stmt->execute();
+        $stmt->close();
+
+        if ($success) {
+            // Recalculate rendered hours for the intern
+            $db->query("UPDATE interns SET rendered_hours = (SELECT COALESCE(SUM(rendered_hours),0) FROM dtr_entries WHERE intern_id = {$internId} AND is_archived = 0) WHERE id = {$internId}");
+            
+            // Fetch newly calculated hours for this entry
+            $hRes = $db->query("SELECT rendered_hours FROM dtr_entries WHERE id = " . $openSession['id']);
+            $hours = $hRes ? $hRes->fetch_row()[0] : 0;
+
+            logAudit('UPDATE', 'DTR', $openSession['id'], "Intern {$name} clocked out via kiosk at {$time} on {$date}. Rendered: {$hours} hrs.");
+
+            echo json_encode([
+                'ok' => true,
+                'message' => 'Clock out successful',
+                'time_in' => $openSession['time_in'],
+                'time_out' => $time,
+                'rendered_hours' => (float)$hours
+            ]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'message' => 'Failed to save DTR data']);
+        }
+    } else {
+        // No open session exists today. Check if there are ANY entries today
+        $stmt = $db->prepare("SELECT COUNT(*) FROM dtr_entries WHERE intern_id = ? AND entry_date = ? AND is_archived = 0");
+        $stmt->bind_param('is', $internId, $date);
+        $stmt->execute();
+        $count = 0;
+        $stmt->bind_result($count);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($count > 0) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'message' => 'Already clocked out today']);
+        } else {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'message' => 'No clock in entry found for today']);
+        }
+    }
+    exit;
 }
