@@ -1140,11 +1140,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 document.getElementById('registrationFlow').classList.add('hidden');
 
                 const qrOutput = document.getElementById('qrCodeOutput');
-                const qrString = document.getElementById('qrCodeString');
                 const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(qrCode);
 
                 qrOutput.src = qrUrl;
-                qrString.innerText = qrCode;
 
                 document.getElementById('successFlow').classList.remove('hidden');
 
