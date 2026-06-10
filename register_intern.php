@@ -160,7 +160,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div class='qr-wrap'>
                     <img src='{$qrImageUrl}' alt='QR Code' style='width:200px;height:200px;'>
                 </div>
-                <div style='font-family: monospace; font-size: 16px; font-weight: bold;'>{$qrCode}</div>
                 <p class='footer'>TDT Powersteel Corp. Intern Management System</p>
             </div>
         </body>
@@ -427,7 +426,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div class="qr-display">
                     <img id="qrCodeOutput" src="" alt="Intern QR Code">
                 </div>
-                <div class="code-string" id="qrCodeString"></div>
 
                 <button type="button" class="btn btn-primary" id="downloadQRBtn">
                     <i class="fas fa-download"></i> Download QR Code
