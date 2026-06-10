@@ -224,7 +224,7 @@ require_once __DIR__ . '/includes/header.php';
                                 <i class="fas fa-arrow-right" style="color:var(--orange)"></i>
                             </a>
                             <?php if ($intern['face_embedding']): ?>
-                                <button class="btn btn-icon btn-sm" title="View QR Code" onclick="showQR(<?= $intern['id'] ?>, '<?= htmlspecialchars($intern['first_name'].' '.$intern['last_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($intern['dept_name'], ENT_QUOTES) ?>')">
+                                <button class="btn btn-icon btn-sm" title="View QR Code" onclick="showQR(<?= $intern['id'] ?>, '<?= htmlspecialchars($intern['first_name'].' '.$intern['last_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($intern['dept_name'], ENT_QUOTES) ?>', '<?= htmlspecialchars($intern['qr_code'] ?? ('TDTINTRN'.$intern['id']), ENT_QUOTES) ?>')">
                                     <i class="fas fa-qrcode" style="color: #22C55E;"></i>
                                 </button>
                                 <button class="btn btn-icon btn-sm" title="Re-register Face ID" onclick="reRegister(<?= $intern['id'] ?>, '<?= htmlspecialchars($intern['first_name'].' '.$intern['last_name'], ENT_QUOTES) ?>')">
@@ -281,11 +281,12 @@ require_once __DIR__ . '/includes/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function showQR(id, name, dept) {
+function showQR(id, name, dept, qrCodeStr) {
+    const finalQrStr = qrCodeStr || ('TDTINTRN' + id);
     document.getElementById('qrInternName').innerText = name;
     document.getElementById('qrInternDept').innerText = dept;
-    document.getElementById('qrImage').src = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=TDTINTRN' + id;
-    document.getElementById('qrCodeText').innerText = 'TDTINTRN' + id;
+    document.getElementById('qrImage').src = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(finalQrStr);
+    document.getElementById('qrCodeText').innerText = finalQrStr;
     openModal('qrModal');
 }
 

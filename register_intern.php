@@ -118,8 +118,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 
-    // Generate unique QR code payload based on ID
-    $qrCode = 'TDTINTRN' . $intern['id'];
+    // Generate unique QR code payload based on ID + 4 random digits to prevent spoofing
+    $qrCode = 'TDTINTRN' . $intern['id'] . '-' . str_pad((string)mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
     $embeddingsJson = json_encode($embeddings);
     $now = date('Y-m-d H:i:s');
 
