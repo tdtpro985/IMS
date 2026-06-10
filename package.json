@@ -1,0 +1,8 @@
+{
+  "name": "tdt-ims",
+  "version": "1.0.0",
+  "description": "TDT Intern Management System",
+  "scripts": {
+    "dev": "node scripts/dev.js"
+  }
+}
