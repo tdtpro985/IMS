@@ -19,8 +19,17 @@ $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
 $internId = isset($input['intern_id']) ? (int)$input['intern_id'] : 0;
 $action = isset($input['action']) ? trim($input['action']) : '';
-$date = isset($input['date']) ? trim($input['date']) : date('Y-m-d');
-$time = isset($input['time']) ? trim($input['time']) : date('H:i:s');
+$isOffline = isset($input['is_offline']) ? (bool)$input['is_offline'] : false;
+
+// Security: Use server time for active online requests to prevent clock tampering.
+// Only respect client-provided time for historical offline syncs.
+if ($isOffline && isset($input['date']) && isset($input['time'])) {
+    $date = trim($input['date']);
+    $time = trim($input['time']);
+} else {
+    $date = date('Y-m-d');
+    $time = date('H:i:s');
+}
 
 if ($internId <= 0 || !in_array($action, ['clock_in', 'clock_out'])) {
     http_response_code(400);
