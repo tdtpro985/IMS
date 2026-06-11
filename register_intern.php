@@ -80,11 +80,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     // Python service is expected to run on port 5001 (usually on the kiosk backend host)
     $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http');
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    
+
     // Attempt to resolve face service URL dynamically
     // If running via proxy, the face server is likely on the same host as the IMS
     $pythonServiceUrl = 'http://localhost:5001/embed';
-    
+
     if (!in_array(parse_url($pythonServiceUrl, PHP_URL_HOST), ['localhost', '127.0.0.1'])) {
         // Fallback for non-local setups
     }
@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['images' => $images]));
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    
+
     // HIGH CONCURRENCY: Increase timeout to 60 seconds to allow queuing during peak registration
     curl_setopt($ch, CURLOPT_TIMEOUT, 60);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 
     // Generate unique QR code payload based on ID + 4 random digits to prevent spoofing
-    $qrCode = 'TDTINTRN' . $intern['id'] . '-' . str_pad((string)mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
+    $qrCode = 'TDTINTRN' . $intern['id'] . '-' . str_pad((string) mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
     $embeddingsJson = json_encode($embeddings);
     $now = date('Y-m-d H:i:s');
 
@@ -254,15 +254,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <!-- Slide 2: Turn Left -->
                         <div class="tutorial-slide" data-slide="1">
                             <div class="tutorial-step-tag">Step 2 of 4</div>
-                            <h3 class="tutorial-title">Slightly Left</h3>
-                            <p class="tutorial-desc">Rotate your head slightly to the left side so the camera captures your
+                            <h3 class="tutorial-title">Slightly Right</h3>
+                            <p class="tutorial-desc">Rotate your head slightly to the right side so the camera captures your
                                 side
                                 profile.
                                 <span class="tutorial-desc-spacer">&nbsp;</span>
                             </p>
                             <div class="phone-mockup">
                                 <div class="phone-screen">
-                                    <img src="assets/img/guide_left<?= $genderSuffix ?>.png" alt="Turn Left">
+                                    <img src="assets/img/guide_right<?= $genderSuffix ?>.png" alt="Turn Right">
                                 </div>
                             </div>
                         </div>
@@ -270,14 +270,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <!-- Slide 3: Turn Right -->
                         <div class="tutorial-slide" data-slide="2">
                             <div class="tutorial-step-tag">Step 3 of 4</div>
-                            <h3 class="tutorial-title">Slightly Right</h3>
-                            <p class="tutorial-desc">Rotate your head slightly to the right side to capture your side
+                            <h3 class="tutorial-title">Slightly Left</h3>
+                            <p class="tutorial-desc">Rotate your head slightly to the left side to capture your side
                                 profile.
                                 <span class="tutorial-desc-spacer">&nbsp;</span>
                             </p>
                             <div class="phone-mockup">
                                 <div class="phone-screen">
-                                    <img src="assets/img/guide_right<?= $genderSuffix ?>.png" alt="Turn Right">
+                                    <img src="assets/img/guide_left<?= $genderSuffix ?>.png" alt="Turn Left">
                                 </div>
                             </div>
                         </div>
@@ -427,7 +427,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <div id="submittingState" class="status-card hidden">
                     <div class="status-icon"><i class="fas fa-spinner fa-spin text-orange"></i></div>
                     <div class="status-title">Processing Biometrics</div>
-                    <div class="status-text">We are analyzing your face profiles and securing your identity. This may take up to 30-60 seconds during peak times. <strong>Please do not close this window or refresh.</strong></div>
+                    <div class="status-text">We are analyzing your face profiles and securing your identity. This may take
+                        up to 30-60 seconds during peak times. <strong>Please do not close this window or refresh.</strong>
+                    </div>
                 </div>
             </div>
 
@@ -793,9 +795,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 const minDim1 = Math.min(vWidth1, vHeight1);
                 const sx1 = (vWidth1 - minDim1) / 2;
                 const sy1 = (vHeight1 - minDim1) / 2;
-                
+
                 ctx.drawImage(webcam, sx1, sy1, minDim1, minDim1, 0, 0, canvas.width, canvas.height);
-                
+
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
                 const base64Data = dataUrl.split(',')[1];
                 capturedImages.push(base64Data);
@@ -810,9 +812,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         const minDim2 = Math.min(vWidth2, vHeight2);
                         const sx2 = (vWidth2 - minDim2) / 2;
                         const sy2 = (vHeight2 - minDim2) / 2;
-                        
+
                         ctx.drawImage(webcam, sx2, sy2, minDim2, minDim2, 0, 0, canvas.width, canvas.height);
-                        
+
                         const dataUrl2 = canvas.toDataURL('image/jpeg', 0.95);
                         const base64Data2 = dataUrl2.split(',')[1];
                         capturedImages.push(base64Data2);
@@ -995,8 +997,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             const steps = [
                 { title: "Look Straight", desc: "Position your face in the center circle and look directly at the camera." },
-                { title: "Slight Left", desc: "Slightly rotate your face horizontally to the left." },
                 { title: "Slight Right", desc: "Slightly rotate your face horizontally to the right." },
+                { title: "Slight Left", desc: "Slightly rotate your face horizontally to the left." },
                 { title: "Tilt Up", desc: "Tilt your chin upwards slightly." }
             ];
 
