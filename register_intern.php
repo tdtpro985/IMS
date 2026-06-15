@@ -85,10 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     // If running via proxy, the face server is likely on the same host as the IMS
     $pythonServiceUrl = 'http://localhost:5001/embed';
 
-    if (!in_array(parse_url($pythonServiceUrl, PHP_URL_HOST), ['localhost', '127.0.0.1'])) {
-        // Fallback for non-local setups
-    }
-
     $ch = curl_init($pythonServiceUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -220,7 +216,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         <div id="modelLoadingOverlay" class="model-loading-overlay">
             <div class="loader-spinner"></div>
             <div class="model-loading-text">Please wait</div>
-            <!-- <div class="model-loading-subtext">Preparing Face Scanner...</div> -->
         </div>
 
         <!-- Onboarding Tutorial Modal -->
@@ -241,7 +236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             <p class="tutorial-desc">Align your face in the center of the frame and look directly at the
                                 camera.
                                 <span class="tutorial-desc-warning">
-                                    <i class="fas fa-glasses"></i> Remove glasses, masks, or hats for best results.
+                                    <i class="fas fa-glasses"></i> Keep glasses on if you normally wear them. Remove masks or hats.
                                 </span>
                             </p>
                             <div class="phone-mockup">
@@ -324,7 +319,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <div class="container">
         <div class="header">
             <img src="assets/img/tdt-logo.png" alt="TDT Powersteel Logo" class="header-logo">
-            <!-- <h2>Intern Registration</h2> -->
             <?php if ($intern): ?>
                 <div class="header-avatar">
                     <i class="fas fa-user"></i>
@@ -415,12 +409,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                     <!-- Obstruction warning tip -->
                     <div class="camera-hint">
-                        <i class="fas fa-glasses text-orange mr-4"></i> Remove glasses,
-                        masks, or hats to ensure accuracy.
+                        <i class="fas fa-glasses text-orange mr-4"></i> Wear daily glasses? Keep them on. Remove masks, hats, or sunglasses.
                     </div>
 
                     <div class="camera-actions">
-                        <button type="button" class="btn btn-primary hidden" id="captureBtn">Capture Angle</button>
+                        <button type="button" class="btn btn-secondary" id="startOverBtn">Start Over</button>
                     </div>
                 </div>
 
@@ -546,7 +539,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             const emailSection = document.getElementById('emailSection');
             const cameraSection = document.getElementById('cameraSection');
             const startCaptureBtn = document.getElementById('startCaptureBtn');
-            const captureBtn = document.getElementById('captureBtn');
             const internEmail = document.getElementById('internEmail');
             const webcam = document.getElementById('webcam');
             const cameraBox = document.getElementById('cameraBox');
@@ -613,7 +605,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 requestAnimationFrame(runDetectionLoop);
             }
 
-            let initialFaceSize = null;
             let lastCaptureTime = 0;
             const CAPTURE_COOLDOWN_MS = 1500;
             let overrideTimer = null;
@@ -632,12 +623,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
 
+            function getFrameBrightness() {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 64;
+                tempCanvas.height = 64;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(webcam, 0, 0, 64, 64);
+                const imageData = tempCtx.getImageData(0, 0, 64, 64);
+                const data = imageData.data;
+                let totalBrightness = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                    totalBrightness += (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+                }
+                return totalBrightness / (data.length / 4);
+            }
+
             function processLandmarkResults(results) {
                 faceWarningMessage.innerText = "";
                 guideCircle.className.baseVal = "guide-circle";
 
                 if (!results || !results.faceLandmarks || results.faceLandmarks.length === 0) {
-                    faceWarningMessage.innerText = "No face detected. Align your face in the circle.";
+                    faceWarningMessage.innerText = "No face detected. Keep face visible (remove masks, hats, or sunglasses). If you wear daily glasses, keep them on.";
                     guideCircle.className.baseVal = "guide-circle error-state";
                     faceIsPresent = false;
                     poseStableStartTime = null;
@@ -666,8 +672,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                     const landmarks = results.faceLandmarks[0];
                     if (landmarks && landmarks[263] && landmarks[33]) {
-                        const width = Math.abs(landmarks[263].x - landmarks[33].x);
-                        processCaptureAngles(yaw, pitch, width);
+                        const boundaryPoints = [
+                            landmarks[10],   // forehead
+                            landmarks[152],  // chin
+                            landmarks[234],  // left cheek
+                            landmarks[454]   // right cheek
+                        ];
+
+                        // Helper to convert normalized coordinate to SVG space
+                        const toSvgCoords = (pt) => {
+                            const rawSvgX = ((pt.x - 0.125) / 0.75) * 280;
+                            const svgX = 280 - rawSvgX;
+                            const svgY = pt.y * 280;
+                            return { x: svgX, y: svgY };
+                        };
+
+                        const pForehead = toSvgCoords(landmarks[10]);
+                        const pChin = toSvgCoords(landmarks[152]);
+                        const pLeftCheek = toSvgCoords(landmarks[234]);
+                        const pRightCheek = toSvgCoords(landmarks[454]);
+
+                        // Compute center and dimensions
+                        const centerX = (pLeftCheek.x + pRightCheek.x) / 2;
+                        const centerY = (pForehead.y + pChin.y) / 2;
+                        const faceW = Math.abs(pLeftCheek.x - pRightCheek.x);
+                        const faceH = Math.abs(pForehead.y - pChin.y);
+                        const faceDiameter = (faceW + faceH) / 2;
+
+                        let hint = "";
+                        if (faceDiameter < 100) {
+                            hint = "Too Far. Move Closer.";
+                        } else if (faceDiameter > 165) {
+                            hint = "Too Close. Move Back.";
+                        } else if (centerX < 115) {
+                            hint = "Move Right";
+                        } else if (centerX > 165) {
+                            hint = "Move Left";
+                        } else if (centerY < 115) {
+                            hint = "Move Down";
+                        } else if (centerY > 165) {
+                            hint = "Move Up";
+                        }
+
+                        let faceInsideCircle = true;
+                        for (const pt of boundaryPoints) {
+                            if (!pt) continue;
+                            const p = toSvgCoords(pt);
+                            const dist = Math.sqrt(Math.pow(p.x - 140, 2) + Math.pow(p.y - 140, 2));
+                            if (dist > 95) {
+                                faceInsideCircle = false;
+                                break;
+                            }
+                        }
+
+                        if (hint) {
+                            faceWarningMessage.innerText = hint;
+                            guideCircle.className.baseVal = "guide-circle error-state";
+                            poseStableStartTime = null;
+                            return;
+                        }
+
+                        if (!faceInsideCircle) {
+                            faceWarningMessage.innerText = "Align your face inside the circle.";
+                            guideCircle.className.baseVal = "guide-circle error-state";
+                            poseStableStartTime = null;
+                            return;
+                        }
+
+
+                        const brightness = getFrameBrightness();
+                        if (brightness < 50) {
+                            faceWarningMessage.innerText = "Too dark. Move to a well-lit area.";
+                            guideCircle.className.baseVal = "guide-circle error-state";
+                            poseStableStartTime = null;
+                            return;
+                        }
+
+                        processCaptureAngles(yaw, pitch);
                     }
                 } else {
                     poseStableStartTime = null;
@@ -780,16 +861,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 });
             }
 
+            function isImageBlurry(canvasElement) {
+                const ctx = canvasElement.getContext('2d');
+                const width = canvasElement.width;
+                const height = canvasElement.height;
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+
+                // Convert to grayscale (luminosity method)
+                const gray = new Uint8Array(width * height);
+                for (let i = 0; i < data.length; i += 4) {
+                    gray[i / 4] = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+                }
+
+                // Compute Laplacian kernel: [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
+                const laplacian = new Float32Array(width * height);
+                let mean = 0;
+                let count = 0;
+
+                for (let y = 1; y < height - 1; y++) {
+                    for (let x = 1; x < width - 1; x++) {
+                        const idx = y * width + x;
+                        const val = gray[idx + 1] + gray[idx - 1] + gray[idx + width] + gray[idx - width] - 4 * gray[idx];
+                        laplacian[idx] = val;
+                        mean += val;
+                        count++;
+                    }
+                }
+                mean /= count;
+
+                // Calculate variance of the Laplacian filter
+                let variance = 0;
+                for (let y = 1; y < height - 1; y++) {
+                    for (let x = 1; x < width - 1; x++) {
+                        const idx = y * width + x;
+                        const diff = laplacian[idx] - mean;
+                        variance += diff * diff;
+                    }
+                }
+                variance /= count;
+
+                console.log("[Blur Check] Laplacian Variance:", variance.toFixed(2));
+
+                // A variance threshold of 50 effectively catches out-of-focus and motion-blurred faces
+                return variance < 50;
+            }
+
             function captureAutoAngle() {
                 if (!faceIsPresent) {
                     faceWarningMessage.innerText = "Cannot capture: No face detected in frame. Align your face.";
                     return;
                 }
-                lastCaptureTime = Date.now();
-                playShutterSound();
-                triggerScreenFlash();
 
-                // Capture first frontal frame (cropping center square to prevent distortion)
+                // Capture frame (cropping center square to prevent distortion)
                 const vWidth1 = webcam.videoWidth;
                 const vHeight1 = webcam.videoHeight;
                 const minDim1 = Math.min(vWidth1, vHeight1);
@@ -797,6 +921,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 const sy1 = (vHeight1 - minDim1) / 2;
 
                 ctx.drawImage(webcam, sx1, sy1, minDim1, minDim1, 0, 0, canvas.width, canvas.height);
+
+                // Reject blurry captures immediately to guarantee high-quality embeddings
+                if (isImageBlurry(canvas)) {
+                    console.warn("[Capture] Discarded blurry frame.");
+                    faceWarningMessage.innerText = "Image was blurry. Please hold still and try again.";
+                    guideCircle.className.baseVal = "guide-circle error-state";
+                    poseStableStartTime = null;
+                    return;
+                }
+
+                lastCaptureTime = Date.now();
+                playShutterSound();
+                triggerScreenFlash();
 
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
                 const base64Data = dataUrl.split(',')[1];
@@ -814,6 +951,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         const sy2 = (vHeight2 - minDim2) / 2;
 
                         ctx.drawImage(webcam, sx2, sy2, minDim2, minDim2, 0, 0, canvas.width, canvas.height);
+
+                        // Reject second capture if it's blurry
+                        if (isImageBlurry(canvas)) {
+                            console.warn("[Capture] Discarded blurry second frame. Retrying Step 1.");
+                            capturedImages.pop(); // Remove first frontal frame
+                            faceWarningMessage.innerText = "Second image was blurry. Please hold still and try again.";
+                            guideCircle.className.baseVal = "guide-circle error-state";
+                            poseStableStartTime = null;
+                            return;
+                        }
 
                         const dataUrl2 = canvas.toDataURL('image/jpeg', 0.95);
                         const base64Data2 = dataUrl2.split(',')[1];
@@ -836,33 +983,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
 
-            function processCaptureAngles(yaw, pitch, faceWidth) {
+            function processCaptureAngles(yaw, pitch) {
                 if (Date.now() - lastCaptureTime < CAPTURE_COOLDOWN_MS) {
                     poseStableStartTime = null;
                     return;
                 }
                 let matched = false;
+                let correctionHint = "";
+
                 if (currentStep === 0) {
-                    if (Math.abs(yaw) <= 15 && Math.abs(pitch) <= 15) {
+                    if (Math.abs(yaw) <= 12 && Math.abs(pitch) <= 12) {
                         matched = true;
+                    } else {
+                        if (yaw > 12) {
+                            correctionHint = "Turn face left slightly";
+                        } else if (yaw < -12) {
+                            correctionHint = "Turn face right slightly";
+                        } else if (pitch > 12) {
+                            correctionHint = "Look down slightly";
+                        } else if (pitch < -12) {
+                            correctionHint = "Look up slightly";
+                        }
                     }
                 } else if (currentStep === 1) {
-                    if (yaw >= 15) {
+                    if (yaw >= 12 && yaw <= 25) {
                         matched = true;
+                    } else {
+                        if (yaw < 0) {
+                            correctionHint = "Turn your head to the right";
+                        } else if (yaw >= 0 && yaw < 12) {
+                            correctionHint = "Turn further to the right";
+                        } else if (yaw > 25) {
+                            correctionHint = "Turn back left slightly";
+                        }
                     }
                 } else if (currentStep === 2) {
-                    if (yaw <= -15) {
+                    if (yaw <= -12 && yaw >= -25) {
                         matched = true;
+                    } else {
+                        if (yaw > 0) {
+                            correctionHint = "Turn your head to the left";
+                        } else if (yaw <= 0 && yaw > -12) {
+                            correctionHint = "Turn further to the left";
+                        } else if (yaw < -25) {
+                            correctionHint = "Turn back right slightly";
+                        }
                     }
                 } else if (currentStep === 3) {
-                    if (pitch >= 12) {
+                    if (pitch >= 10 && pitch <= 22) {
                         matched = true;
+                    } else {
+                        if (pitch < 0) {
+                            correctionHint = "Tilt your chin up";
+                        } else if (pitch >= 0 && pitch < 10) {
+                            correctionHint = "Tilt further up";
+                        } else if (pitch > 22) {
+                            correctionHint = "Tilt back down slightly";
+                        }
                     }
                 }
 
                 if (matched) {
                     guideCircle.className.baseVal = "guide-circle captured";
-                    captureInstructions.innerHTML = "<strong>Hold still...</strong>";
+                    captureInstructions.innerHTML = "<strong style='color:#22C55E; font-size: 1.1rem;'>Good! Please hold still...</strong>";
 
                     if (poseStableStartTime === null) {
                         poseStableStartTime = Date.now();
@@ -872,7 +1055,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     }
                 } else {
                     poseStableStartTime = null;
-                    captureInstructions.innerHTML = `<span class="text-xs text-muted">${steps[currentStep].desc}</span>`;
+                    if (correctionHint) {
+                        captureInstructions.innerHTML = `<span class="text-xs text-orange" style="font-weight: 600;">${correctionHint}</span>`;
+                    } else {
+                        captureInstructions.innerHTML = `<span class="text-xs text-muted">${steps[currentStep].desc}</span>`;
+                    }
                 }
             }
 
@@ -908,7 +1095,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 currentTutSlide = index;
 
                 if (currentTutSlide === tutSlides.length - 1) {
-                    tutNextBtn.innerHTML = 'I\'m Ready! <i class="fas fa-camera" class="ml-6"></i>';
+                    tutNextBtn.innerHTML = 'I\'m Ready! <i class="fas fa-camera ml-6"></i>';
                 } else {
                     tutNextBtn.innerHTML = 'Next <i class="fas fa-arrow-right ml-6"></i>';
                 }
@@ -1041,7 +1228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 // Check email availability via AJAX
                 try {
                     startCaptureBtn.disabled = true;
-                    startCaptureBtn.innerHTML = '<i class="fas fa-spinner fa-spin" class="mr-4"></i> Verifying...';
+                    startCaptureBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-4"></i> Verifying...';
 
                     const checkData = new FormData();
                     checkData.append('action', 'check_email_availability');
@@ -1075,7 +1262,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 setTimeout(() => showSlide(0, false), 50);
             });
 
-            captureBtn.addEventListener('click', confirmManualCapture);
+            const startOverBtn = document.getElementById('startOverBtn');
+            if (startOverBtn) {
+                startOverBtn.addEventListener('click', () => {
+                    currentStep = 0;
+                    capturedImages.length = 0;
+                    
+                    // Reset step indicators
+                    dots.forEach(dot => {
+                        dot.className = 'step-dot';
+                    });
+                    dots[0].classList.add('active');
+
+                    // Reset warnings and instructions
+                    faceWarningMessage.innerText = "";
+                    guideCircle.className.baseVal = "guide-circle";
+                    poseStableStartTime = null;
+                    lastCaptureTime = 0;
+
+                    updateStepUI();
+                    console.log("[Capture] Reset capture flow. Starting over from Step 1.");
+                });
+            }
 
             function updateStepUI() {
                 dots.forEach((dot, idx) => {

@@ -154,6 +154,8 @@ body {
     position: relative;
     width: 280px;
     height: 280px;
+    max-width: 100%;
+    aspect-ratio: 1;
     margin: 1.25rem auto 0;
     border-radius: 50%;
     overflow: hidden;
