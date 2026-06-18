@@ -48,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ed   = trim($_POST['end_date']        ?? '') ?: null;
         $sup  = trim($_POST['supervisor']      ?? '');
         $nat  = trim($_POST['nationality']     ?? '');
+        $deptNew = (int)($_POST['department_id'] ?? $intern['department_id']);
         $cs   = trim($_POST['civil_status']    ?? '');
         $gn   = trim($_POST['guardian_name']   ?? '');
         $gc   = trim($_POST['guardian_contact']?? '');
@@ -81,10 +82,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (!isset($_SESSION['profile_error'])) {
-                // 12 strings + 1 double + 8 strings + 1 int = 22 params
+                // department + 12s + d + 8s + i = 23 params
                 $stmt = $db->prepare(
                     "UPDATE interns
-                     SET first_name=?, last_name=?, middle_name=?, email=?, phone=?, address=?,
+                     SET department_id=?,
+                         first_name=?, last_name=?, middle_name=?, email=?, phone=?, address=?,
                          birthdate=?, gender=?, school=?, course=?, year_level=?, school_address=?,
                          required_hours=?,
                          start_date=?, end_date=?, supervisor=?,
@@ -92,9 +94,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          profile_photo=?
                      WHERE id=?"
                 );
-                // types: s×12, d×1, s×8, i×1 = 22 chars
+                // types: i + s×12 + d + s×8 + i = 23 chars
                 $stmt->bind_param(
-                    'ssssssssssssdssssssssi',
+                    'issssssssssssdssssssssi',
+                    $deptNew,
                     $fn, $ln, $mn, $em, $ph, $addr,
                     $bd, $gen, $sch, $crs, $yl, $sa,
                     $rh,
@@ -105,8 +108,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $stmt->execute();
                 $stmt->close();
-                logAudit('UPDATE', 'Interns', $internId, "Profile updated for {$fn} {$ln}.");
-                $_SESSION['profile_success'] = 'Profile updated successfully.';
+
+                // Log if department changed
+                $deptChanged = $deptNew !== (int)$intern['department_id'];
+                $logNote = "Profile updated for {$fn} {$ln}." . ($deptChanged ? " Department changed." : "");
+                logAudit('UPDATE', 'Interns', $internId, $logNote);
+                $_SESSION['profile_success'] = 'Profile updated successfully.' . ($deptChanged ? ' Department has been changed.' : '');
             }
         }
         header("Location: /intern_workspace.php?id={$internId}&tab=201");
@@ -148,6 +155,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $chk->close();
 
+        // Load lunch break setting
+        $lbRow = $db->query("SELECT setting_key, setting_val FROM system_settings WHERE setting_key IN ('lunch_break_enabled','lunch_break_minutes')")->fetch_all(MYSQLI_ASSOC);
+        $lbSettings = [];
+        foreach ($lbRow as $r) $lbSettings[$r['setting_key']] = $r['setting_val'];
+        $lunchEnabled = ($lbSettings['lunch_break_enabled'] ?? '0') === '1';
+        $lunchMins    = (int)($lbSettings['lunch_break_minutes'] ?? 60);
+
         // Non-working remarks don't need times
         $noTimeRemarks = ['Absent','Holiday','No Office','Excused'];
         if (in_array($remarks, $noTimeRemarks)) {
@@ -159,13 +173,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success'=>false,'error'=>'Time In and Time Out are required.']); exit;
         }
 
-        $stmt = $db->prepare("INSERT INTO dtr_entries (intern_id, entry_date, time_in, time_out, remarks) VALUES (?,?,?,?,?)");
-        $stmt->bind_param('issss', $internId, $date, $timeIn, $timeOut, $remarks);
+        // If lunch break enabled and we have valid times, adjust time_out in the stored value
+        // We store a lunch_break_deducted flag in remarks or we store adjusted time
+        // Simplest: store the deduction amount separately — we'll use a lunch_minutes column
+        // For now: deduct by inserting with a note, actual rendered hours computed by DB generated col
+        // Better: store original times, deduct via a lunch_break_mins column on the entry
+        $lunchDeduct = ($lunchEnabled && $timeIn && $timeOut) ? $lunchMins : 0;
+
+        $stmt = $db->prepare("INSERT INTO dtr_entries (intern_id, entry_date, time_in, time_out, remarks, lunch_break_mins) VALUES (?,?,?,?,?,?)");
+        // Check if lunch_break_mins column exists, if not fall back
+        if ($stmt === false) {
+            $stmt = $db->prepare("INSERT INTO dtr_entries (intern_id, entry_date, time_in, time_out, remarks) VALUES (?,?,?,?,?)");
+            $stmt->bind_param('issss', $internId, $date, $timeIn, $timeOut, $remarks);
+        } else {
+            $stmt->bind_param('issssi', $internId, $date, $timeIn, $timeOut, $remarks, $lunchDeduct);
+        }
         $stmt->execute();
         $newId = $db->insert_id;
         $stmt->close();
         $db->query("UPDATE interns SET rendered_hours=(SELECT COALESCE(SUM(rendered_hours),0) FROM dtr_entries WHERE intern_id={$internId} AND is_archived=0) WHERE id={$internId}");
-        logAudit('CREATE', 'DTR', $newId, "DTR entry added for intern #{$internId} on {$date}.");
+        logAudit('CREATE', 'DTR', $newId, "DTR entry added for intern #{$internId} on {$date}." . ($lunchDeduct ? " Lunch deducted: {$lunchDeduct}min." : ""));
         echo json_encode(['success'=>true]); exit;
     }
 

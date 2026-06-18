@@ -34,13 +34,15 @@ function navItem(string $href, string $icon, string $label, string $page, string
 
     <!-- Navigation -->
     <nav class="sidebar-nav">
-        <?= navItem('/dashboard.php',   'fa-th-large',    'Dashboard',         $activePage, 'dashboard') ?>
-        <?= navItem('/departments.php', 'fa-building',    'Departments',       $activePage, 'departments') ?>
-        <?= navItem('/interns.php',     'fa-users',       'Intern Management', $activePage, 'interns') ?>
-        <?= navItem('/reports.php',     'fa-file-export', 'Reports & Export',  $activePage, 'reports') ?>
-        <?= navItem('/audit.php',       'fa-history',     'Audit Trail',       $activePage, 'audit') ?>
+        <?= navItem('/dashboard.php',   'fa-th-large',      'Dashboard',         $activePage, 'dashboard') ?>
+        <?= navItem('/departments.php', 'fa-building',      'Departments',       $activePage, 'departments') ?>
+        <?= navItem('/interns.php',     'fa-users',         'Intern Management', $activePage, 'interns') ?>
+        <?= navItem('/moa.php',         'fa-file-contract', 'MOA Management',    $activePage, 'moa') ?>
+        <?= navItem('/policies.php',    'fa-shield-alt',    'Policy Hub',        $activePage, 'policies') ?>
+        <?= navItem('/reports.php',     'fa-file-export',   'Reports & Export',  $activePage, 'reports') ?>
+        <?= navItem('/audit.php',       'fa-history',       'Audit Trail',       $activePage, 'audit') ?>
         <?php if (isAdmin()): ?>
-        <?= navItem('/settings.php',    'fa-cog',         'Settings',          $activePage, 'settings') ?>
+        <?= navItem('/settings.php',    'fa-cog',           'Settings',          $activePage, 'settings') ?>
         <?php endif; ?>
     </nav>
 

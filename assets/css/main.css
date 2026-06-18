@@ -469,10 +469,12 @@ table.ims-table {
 }
 
 .badge-active   { background: #ECFDF5; color: #16A34A; }
+.badge-inactive { background: #FFFBEB; color: #D97706; }
 .badge-archived { background: #F3F4F6; color: #6B7280; }
 .badge-pending  { background: #FFFBEB; color: #D97706; }
 .badge-submitted{ background: #EFF6FF; color: #2563EB; }
 .badge-approved { background: #ECFDF5; color: #16A34A; }
+.btn-warning    { background: #F59E0B; color: #fff; }
 
 /* ---------- Search & Filter Bar ---------- */
 .toolbar {
