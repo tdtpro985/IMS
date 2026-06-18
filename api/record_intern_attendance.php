@@ -1,4 +1,5 @@
 <?php
+ini_set('display_errors', '0');
 date_default_timezone_set('Asia/Manila');
 // API endpoint for kiosk to record intern clock-in / clock-out.
 header('Access-Control-Allow-Origin: *');

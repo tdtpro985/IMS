@@ -1,4 +1,5 @@
 <?php
+ini_set('display_errors', '0');
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/config/audit.php';
 
@@ -95,9 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
 
-    if ($curlError) {
+    if ($response === false) {
         echo json_encode(['success' => false, 'error' => 'Face service offline. Please try again later.']);
         exit;
     }
