@@ -119,9 +119,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     $result = json_decode($response, true);
     $embeddings = $result['embeddings'] ?? null; // Should be array of 5 arrays of 512 floats
+    $embeddings_large = $result['embeddings_large'] ?? null;
 
     // Validate embeddings structure
-    if (!is_array($embeddings) || count($embeddings) !== 5) {
+    if (!is_array($embeddings) || count($embeddings) !== 5 || !is_array($embeddings_large) || count($embeddings_large) !== 5) {
         echo json_encode(['success' => false, 'error' => 'Failed to process all face angles. Please retry.']);
         exit;
     }
@@ -133,19 +134,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 
+    foreach ($embeddings_large as $emb) {
+        if (!is_array($emb) || count($emb) !== 512) {
+            echo json_encode(['success' => false, 'error' => 'Invalid large embedding shape returned from face service.']);
+            exit;
+        }
+    }
+
     // Generate unique QR code payload based on ID + 4 random digits to prevent spoofing
     $qrCode = 'TDTINTRN' . $intern['id'] . '-' . str_pad((string) mt_rand(0, 9999), 4, '0', STR_PAD_LEFT);
     $embeddingsJson = json_encode($embeddings);
+    $embeddingsLargeJson = json_encode($embeddings_large);
     $now = date('Y-m-d H:i:s');
 
     // Update intern record and clear token
     $stmt = $db->prepare(
         "UPDATE interns 
-         SET email = ?, face_embedding = ?, qr_code = ?, face_registered_at = ?, 
+         SET email = ?, face_embedding = ?, face_embedding_large = ?, qr_code = ?, face_registered_at = ?, 
              registration_token = NULL, token_expires_at = NULL 
          WHERE id = ?"
     );
-    $stmt->bind_param('ssssi', $email, $embeddingsJson, $qrCode, $now, $intern['id']);
+    $stmt->bind_param('sssssi', $email, $embeddingsJson, $embeddingsLargeJson, $qrCode, $now, $intern['id']);
     $success = $stmt->execute();
     $stmt->close();
 
@@ -236,7 +245,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             <p class="tutorial-desc">Align your face in the center of the frame and look directly at the
                                 camera.
                                 <span class="tutorial-desc-warning">
-                                    <i class="fas fa-glasses"></i> Keep glasses on if you normally wear them. Remove masks or hats.
+                                    <i class="fas fa-glasses"></i> Keep glasses on if you normally wear them. Remove masks
+                                    or hats.
                                 </span>
                             </p>
                             <div class="phone-mockup">
@@ -249,8 +259,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <!-- Slide 2: Turn Left -->
                         <div class="tutorial-slide" data-slide="1">
                             <div class="tutorial-step-tag">Step 2 of 4</div>
-                            <h3 class="tutorial-title">Slightly Right</h3>
-                            <p class="tutorial-desc">Rotate your head slightly to the right side so the camera captures your
+                            <h3 class="tutorial-title">Turn Right</h3>
+                            <p class="tutorial-desc">Rotate your head to the right side so the camera captures your
                                 side
                                 profile.
                                 <span class="tutorial-desc-spacer">&nbsp;</span>
@@ -265,8 +275,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <!-- Slide 3: Turn Right -->
                         <div class="tutorial-slide" data-slide="2">
                             <div class="tutorial-step-tag">Step 3 of 4</div>
-                            <h3 class="tutorial-title">Slightly Left</h3>
-                            <p class="tutorial-desc">Rotate your head slightly to the left side to capture your side
+                            <h3 class="tutorial-title">Turn Left</h3>
+                            <p class="tutorial-desc">Rotate your head to the left side to capture your side
                                 profile.
                                 <span class="tutorial-desc-spacer">&nbsp;</span>
                             </p>
@@ -281,7 +291,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div class="tutorial-slide" data-slide="3">
                             <div class="tutorial-step-tag">Step 4 of 4</div>
                             <h3 class="tutorial-title">Tilt Up</h3>
-                            <p class="tutorial-desc">Tilt your chin and head slightly upwards while facing forward.
+                            <p class="tutorial-desc">Tilt your chin and head upwards while facing forward.
                                 <span class="tutorial-desc-spacer">&nbsp;</span>
                             </p>
                             <div class="phone-mockup">
@@ -385,7 +395,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         <div id="cameraFlash" class="camera-flash"></div>
                         <!-- Dynamic SVG face alignment guide overlay -->
                         <svg class="svg-guide-overlay" viewBox="0 0 280 280">
-                            <circle class="guide-circle" id="guideCircle" cx="140" cy="140" r="95" />
+                            <circle class="guide-circle" id="guideCircle" cx="140" cy="140" r="75" />
                         </svg>
                     </div>
 
@@ -409,7 +419,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                     <!-- Obstruction warning tip -->
                     <div class="camera-hint">
-                        <i class="fas fa-glasses text-orange mr-4"></i> Wear daily glasses? Keep them on. Remove masks, hats, or sunglasses.
+                        <i class="fas fa-glasses text-orange mr-4"></i> Wear daily glasses? Keep them on. Remove masks,
+                        hats, or sunglasses.
                     </div>
 
                     <div class="camera-actions">
@@ -498,7 +509,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             </div>
         </div>
 
-        <canvas id="captureCanvas" class="hidden" width="224" height="224"></canvas>
+        <canvas id="captureCanvas" class="hidden" width="480" height="480"></canvas>
     <?php endif; ?>
 
     <script>
@@ -633,7 +644,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 const data = imageData.data;
                 let totalBrightness = 0;
                 for (let i = 0; i < data.length; i += 4) {
-                    totalBrightness += (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+                    totalBrightness += (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
                 }
                 return totalBrightness / (data.length / 4);
             }
@@ -700,9 +711,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         const faceDiameter = (faceW + faceH) / 2;
 
                         let hint = "";
-                        if (faceDiameter < 100) {
+                        if (faceDiameter < 70) {
                             hint = "Too Far. Move Closer.";
-                        } else if (faceDiameter > 165) {
+                        } else if (faceDiameter > 115) {
                             hint = "Too Close. Move Back.";
                         } else if (centerX < 115) {
                             hint = "Move Right";
@@ -719,7 +730,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             if (!pt) continue;
                             const p = toSvgCoords(pt);
                             const dist = Math.sqrt(Math.pow(p.x - 140, 2) + Math.pow(p.y - 140, 2));
-                            if (dist > 95) {
+                            if (dist > 75) {
                                 faceInsideCircle = false;
                                 break;
                             }
@@ -1006,39 +1017,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         }
                     }
                 } else if (currentStep === 1) {
-                    if (yaw >= 12 && yaw <= 25) {
+                    if (yaw >= 25 && yaw <= 45 && Math.abs(pitch) <= 12) {
                         matched = true;
                     } else {
                         if (yaw < 0) {
                             correctionHint = "Turn your head to the right";
-                        } else if (yaw >= 0 && yaw < 12) {
+                        } else if (yaw >= 0 && yaw < 25) {
                             correctionHint = "Turn further to the right";
-                        } else if (yaw > 25) {
+                        } else if (yaw > 45) {
                             correctionHint = "Turn back left slightly";
+                        } else if (pitch > 12) {
+                            correctionHint = "Look down to level your face";
+                        } else if (pitch < -12) {
+                            correctionHint = "Look up to level your face";
                         }
                     }
                 } else if (currentStep === 2) {
-                    if (yaw <= -12 && yaw >= -25) {
+                    if (yaw <= -25 && yaw >= -45 && Math.abs(pitch) <= 12) {
                         matched = true;
                     } else {
                         if (yaw > 0) {
                             correctionHint = "Turn your head to the left";
-                        } else if (yaw <= 0 && yaw > -12) {
+                        } else if (yaw <= 0 && yaw > -25) {
                             correctionHint = "Turn further to the left";
-                        } else if (yaw < -25) {
+                        } else if (yaw < -45) {
                             correctionHint = "Turn back right slightly";
+                        } else if (pitch > 12) {
+                            correctionHint = "Look down to level your face";
+                        } else if (pitch < -12) {
+                            correctionHint = "Look up to level your face";
                         }
                     }
                 } else if (currentStep === 3) {
-                    if (pitch >= 10 && pitch <= 22) {
+                    if (pitch >= 22 && pitch <= 40 && Math.abs(yaw) <= 12) {
                         matched = true;
                     } else {
                         if (pitch < 0) {
                             correctionHint = "Tilt your chin up";
-                        } else if (pitch >= 0 && pitch < 10) {
+                        } else if (pitch >= 0 && pitch < 22) {
                             correctionHint = "Tilt further up";
-                        } else if (pitch > 22) {
+                        } else if (pitch > 40) {
                             correctionHint = "Tilt back down slightly";
+                        } else if (yaw > 12) {
+                            correctionHint = "Look further right to center";
+                        } else if (yaw < -12) {
+                            correctionHint = "Look further left to center";
                         }
                     }
                 }
@@ -1184,9 +1207,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             const steps = [
                 { title: "Look Straight", desc: "Position your face in the center circle and look directly at the camera." },
-                { title: "Slight Right", desc: "Slightly rotate your face horizontally to the right." },
-                { title: "Slight Left", desc: "Slightly rotate your face horizontally to the left." },
-                { title: "Tilt Up", desc: "Tilt your chin upwards slightly." }
+                { title: "Turn Right", desc: "Rotate your face horizontally to the right." },
+                { title: "Turn Left", desc: "Rotate your face horizontally to the left." },
+                { title: "Tilt Up", desc: "Tilt your chin upwards." }
             ];
 
             startCaptureBtn.addEventListener('click', async () => {
@@ -1267,7 +1290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 startOverBtn.addEventListener('click', () => {
                     currentStep = 0;
                     capturedImages.length = 0;
-                    
+
                     // Reset step indicators
                     dots.forEach(dot => {
                         dot.className = 'step-dot';
