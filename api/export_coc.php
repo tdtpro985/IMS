@@ -17,28 +17,47 @@ $stmt->close();
 
 if (!$intern) { http_response_code(404); exit('Intern not found.'); }
 
-$fullName  = strtoupper($intern['first_name'] . ' ' . ($intern['middle_name'] ? $intern['middle_name'].' ' : '') . $intern['last_name']);
-$lastName  = strtoupper($intern['last_name']);
-$hours     = number_format($intern['required_hours'], 0);
-$startDate = $intern['start_date'] ? date('F j, Y', strtotime($intern['start_date'])) : '___________';
-$endDate   = $intern['end_date']   ? date('F j, Y', strtotime($intern['end_date']))   : '___________';
+// ── End date: use last DTR entry date if available, else intern end_date ──
+$stmt = $db->prepare(
+    "SELECT MAX(entry_date) AS last_date FROM dtr_entries
+     WHERE intern_id = ? AND is_archived = 0 AND entry_date IS NOT NULL"
+);
+$stmt->bind_param('i', $internId);
+$stmt->execute();
+$lastDtr = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-// Day with ordinal suffix
-$day      = $intern['end_date'] ? date('j', strtotime($intern['end_date'])) : '___';
-$month    = $intern['end_date'] ? date('F Y', strtotime($intern['end_date'])) : '______';
-$ordinal  = match(true) {
-    $day % 100 >= 11 && $day % 100 <= 13 => $day.'th',
-    $day % 10 === 1 => $day.'st',
-    $day % 10 === 2 => $day.'nd',
-    $day % 10 === 3 => $day.'rd',
-    default         => $day.'th'
+$effectiveEndDate = $lastDtr['last_date'] ?? $intern['end_date'] ?? null;
+
+// ── Name: FIRST MIDDLE_INITIAL. LAST ──
+$mn = $intern['middle_name'] ?? '';
+$middleInitial = $mn ? strtoupper(substr(trim($mn), 0, 1)) . '.' : '';
+$fullName = strtoupper(
+    $intern['first_name'] . ' ' .
+    ($middleInitial ? $middleInitial . ' ' : '') .
+    $intern['last_name']
+);
+
+$lastName  = $intern['last_name'];
+$hours     = number_format($intern['required_hours'], 0);
+$startDate = $intern['start_date']  ? date('F j, Y', strtotime($intern['start_date'])) : '___________';
+$endDate   = $effectiveEndDate      ? date('F j, Y', strtotime($effectiveEndDate))      : '___________';
+
+// Ordinal for "Given this X day"
+$givenDate = $effectiveEndDate ?? date('Y-m-d');
+$day       = (int)date('j', strtotime($givenDate));
+$monthYear = date('F Y', strtotime($givenDate));
+$ordinal   = match(true) {
+    $day % 100 >= 11 && $day % 100 <= 13 => $day . 'th',
+    $day % 10 === 1 => $day . 'st',
+    $day % 10 === 2 => $day . 'nd',
+    $day % 10 === 3 => $day . 'rd',
+    default         => $day . 'th'
 };
 
 // Gender pronoun
-$pronoun = match($intern['gender'] ?? '') {
-    'Female' => 'her',
-    default  => 'his',
-};
+$pronoun    = ($intern['gender'] ?? '') === 'Female' ? 'her' : 'his';
+$salutation = ($intern['gender'] ?? '') === 'Female' ? 'Ms.' : 'Mr.';
 
 header('Content-Type: text/html; charset=utf-8');
 ?>
@@ -49,138 +68,173 @@ header('Content-Type: text/html; charset=utf-8');
 <title>Certificate of Completion — <?= htmlspecialchars($intern['first_name'].' '.$intern['last_name']) ?></title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
   body {
       font-family: 'Times New Roman', Times, serif;
-      background: #fff;
+      background: #f0f0f0;
       color: #222;
   }
 
+  .print-btn {
+      display: block;
+      margin: 20px auto 12px;
+      background: #E8621A;
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+      width: fit-content;
+  }
+
+  /* ── Page ── */
   .page {
-      width: 816px;
-      min-height: 1056px;
-      margin: 0 auto;
-      padding: 0;
+      width: 780px;
+      min-height: 1040px;
+      margin: 0 auto 30px;
+      background: #fff;
       display: flex;
       flex-direction: column;
-      position: relative;
-      border: 1px solid #ddd;
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 20px rgba(0,0,0,.12);
   }
 
   /* ── Header ── */
   .cert-header {
-      padding: 28px 60px 16px;
+      padding: 14px 48px 10px;
       border-bottom: 3px solid #E8621A;
+      text-align: center;
   }
-  .cert-header img.logo-img {
-      height: 70px;
+
+  .cert-header img {
+      height: 54px;
       width: auto;
+      max-width: 320px;
       display: block;
+      margin: 0 auto;
+      object-fit: contain;
   }
 
   /* ── Body ── */
   .cert-body {
       flex: 1;
-      padding: 50px 80px 40px;
-      text-align: center;
+      padding: 48px 80px 36px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      text-align: center;
   }
 
   .cert-title {
       font-family: Arial, sans-serif;
-      font-size: 26px;
+      font-size: 24px;
       font-weight: 900;
       letter-spacing: 3px;
       text-transform: uppercase;
-      color: #222;
-      margin-bottom: 30px;
+      color: #111;
+      margin-bottom: 28px;
   }
 
   .cert-certify {
       font-size: 13px;
-      color: #555;
-      margin-bottom: 18px;
+      color: #444;
       font-style: italic;
+      margin-bottom: 14px;
   }
 
   .cert-name {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
       text-decoration: underline;
       letter-spacing: 1px;
-      margin-bottom: 20px;
+      margin-bottom: 22px;
       color: #111;
   }
 
-  .cert-body-text {
+  .cert-text {
       font-size: 13px;
-      line-height: 1.9;
+      line-height: 1.95;
       color: #333;
-      max-width: 580px;
-      text-align: center;
+      max-width: 520px;
   }
 
   .cert-company {
       font-size: 14px;
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: .5px;
+      color: #111;
   }
 
+  .cert-dates {
+      font-size: 13px;
+      color: #333;
+      margin-top: 16px;
+  }
+
+  .cert-dates u { text-decoration: underline; }
+
   .cert-request {
-      font-size: 12px;
-      color: #444;
-      margin-top: 24px;
-      line-height: 1.8;
+      font-size: 12.5px;
+      color: #333;
+      margin-top: 22px;
+      line-height: 1.85;
+      max-width: 500px;
   }
 
   .cert-given {
-      font-size: 12px;
-      color: #444;
+      font-size: 12.5px;
+      color: #333;
       margin-top: 14px;
   }
 
   /* ── Signature ── */
   .cert-signature {
-      margin-top: 60px;
+      margin-top: 56px;
       text-align: center;
   }
-  .sig-name  { font-size: 14px; font-weight: 700; }
-  .sig-title { font-size: 11px; font-style: italic; color: #555; line-height: 1.7; }
+
+  .sig-name {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: #111;
+  }
+
+  .sig-title {
+      font-size: 12px;
+      font-style: italic;
+      color: #444;
+      line-height: 1.75;
+      margin-top: 3px;
+  }
 
   .cert-watermark {
-      font-size: 9.5px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: #999;
-      margin-top: 30px;
       font-family: Arial, sans-serif;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #aaa;
+      margin-top: 32px;
   }
 
   /* ── Footer ── */
   .cert-footer {
-      padding: 12px 60px;
+      padding: 10px 48px;
       border-top: 2px solid #E8621A;
       text-align: center;
       font-family: Arial, sans-serif;
       font-size: 8.5px;
-      color: #999;
-      line-height: 1.7;
-  }
-
-  .print-btn {
-      display: block; margin: 20px auto;
-      background: #E8621A; color: #fff; border: none;
-      padding: 10px 24px; border-radius: 6px;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-      font-family: Arial, sans-serif;
+      color: #888;
+      line-height: 1.8;
   }
 
   @media print {
+      body { background: #fff; }
       .print-btn { display: none !important; }
-      body { margin: 0; }
-      .page { border: none; }
+      .page { border: none; box-shadow: none; margin: 0; }
   }
 </style>
 </head>
@@ -190,9 +244,9 @@ header('Content-Type: text/html; charset=utf-8');
 
 <div class="page">
 
-    <!-- Header -->
+    <!-- Header — logo image, matches the actual COC template -->
     <div class="cert-header">
-        <img src="/uploads/photos/logo-light.jpg" alt="TDT Powersteel" class="logo-img">
+        <img src="/uploads/photos/logo-light.jpg" alt="TDT Powersteel Corp.">
     </div>
 
     <!-- Body -->
@@ -200,35 +254,33 @@ header('Content-Type: text/html; charset=utf-8');
 
         <div class="cert-title">Certificate of Completion</div>
 
-        <div class="cert-certify">This is to certify that</div>
+        <p class="cert-certify">This is to certify that</p>
 
         <div class="cert-name"><?= htmlspecialchars($fullName) ?></div>
 
-        <div class="cert-body-text">
+        <p class="cert-text">
             has completed <?= $pronoun ?> internship program with total hours of
             <strong><?= $hours ?> hours</strong> at<br>
             <span class="cert-company">TDT POWERSTEEL CORP.</span>
-        </div>
+        </p>
 
-        <br>
-
-        <div class="cert-body-text">
+        <p class="cert-dates">
             from <u><?= $startDate ?></u> to <u><?= $endDate ?></u>
-        </div>
+        </p>
 
-        <div class="cert-request">
+        <p class="cert-request">
             This certification is being issued upon request of
-            <strong>Mr./Ms. <?= htmlspecialchars($lastName) ?></strong>
+            <strong><?= $salutation ?> <?= htmlspecialchars($lastName) ?></strong>
             for academic purposes only.
-        </div>
+        </p>
 
-        <div class="cert-given">
-            Given this <?= $ordinal ?> day of <?= $month ?> at Sampaloc, Manila.
-        </div>
+        <p class="cert-given">
+            Given this <?= $ordinal ?> day of <?= $monthYear ?> at Sampaloc, Manila.
+        </p>
 
-        <!-- Signature -->
+        <!-- Signature block -->
         <div class="cert-signature">
-            <div class="sig-name">Monaliza R. Acuña, CPA, MIRS|</div>
+            <div class="sig-name">Monaliza R. Acu&#241;a, CPA, MIR</div>
             <div class="sig-title">
                 AVP for Finance and Accounting<br>
                 HR &amp; Admin Officer-in-charge

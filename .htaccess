@@ -10,6 +10,9 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Route /register to register_intern.php
+    RewriteRule ^register$ register_intern.php [L,QSA]
+
     # Block sensitive directories
     RewriteRule ^(config|includes|modules|db)/ - [F,L]
 </IfModule>

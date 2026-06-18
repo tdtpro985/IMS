@@ -52,6 +52,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success = 'Account unlocked.';
     }
 
+    // Save system settings
+    if ($action === 'save_settings') {
+        $lunchEnabled = isset($_POST['lunch_break_enabled']) ? '1' : '0';
+        $lunchMins    = max(0, min(120, (int)($_POST['lunch_break_minutes'] ?? 60)));
+        $stdHours     = max(1, min(12,  (int)($_POST['standard_hours']      ?? 8)));
+
+        $pairs = [
+            'lunch_break_enabled' => $lunchEnabled,
+            'lunch_break_minutes' => (string)$lunchMins,
+            'standard_hours'      => (string)$stdHours,
+        ];
+        foreach ($pairs as $k => $v) {
+            $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_val) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_val=?");
+            $stmt->bind_param('sss', $k, $v, $v);
+            $stmt->execute(); $stmt->close();
+        }
+        logAudit('UPDATE', 'Settings', null, "Shift/Hours settings updated.");
+        $success = 'Settings saved successfully.';
+    }
+
     // Change own password
     if ($action === 'change_password') {
         $current = $_POST['current_password'] ?? '';
@@ -83,6 +103,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $users = $db->query("SELECT id, name, email, role, is_locked, fail_count, created_at FROM users ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
+
+// Fetch system settings
+$sRows = $db->query("SELECT setting_key, setting_val FROM system_settings")->fetch_all(MYSQLI_ASSOC);
+$sysSettings = [];
+foreach ($sRows as $r) $sysSettings[$r['setting_key']] = $r['setting_val'];
+$lunchEnabled = ($sysSettings['lunch_break_enabled'] ?? '0') === '1';
+$lunchMins    = (int)($sysSettings['lunch_break_minutes'] ?? 60);
+$stdHours     = (int)($sysSettings['standard_hours']      ?? 8);
 
 $pageTitle   = 'Settings';
 $breadcrumbs = [['label' => 'Settings', 'url' => '']];
@@ -162,6 +190,44 @@ require_once __DIR__ . '/includes/header.php';
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+
+<!-- Shift & Hours Settings -->
+<div class="card mb-24">
+    <div class="card-header"><span class="card-title"><i class="fas fa-clock text-orange"></i> Shift &amp; Hours Customization</span></div>
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="action" value="save_settings">
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;font-weight:500">
+                    <input type="checkbox" name="lunch_break_enabled" value="1"
+                           <?= $lunchEnabled ? 'checked' : '' ?>
+                           style="width:16px;height:16px;accent-color:var(--orange)">
+                    Deduct lunch break / rest period from rendered hours
+                </label>
+                <p class="text-muted mt-4" style="font-size:12px;margin-left:26px">
+                    When enabled, the lunch break duration below is subtracted from each DTR entry's rendered hours.
+                </p>
+            </div>
+            <div class="form-row" style="max-width:420px">
+                <div class="form-group">
+                    <label class="form-label">Lunch Break Duration (minutes)</label>
+                    <input type="number" name="lunch_break_minutes" class="form-control"
+                           value="<?= $lunchMins ?>" min="0" max="120" step="5">
+                    <span style="font-size:11px;color:var(--text-muted)">Default: 60 minutes</span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Standard Daily Hours Threshold</label>
+                    <input type="number" name="standard_hours" class="form-control"
+                           value="<?= $stdHours ?>" min="1" max="12" step="0.5">
+                    <span style="font-size:11px;color:var(--text-muted)">Used to compute overtime (default: 8 hrs)</span>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-8">
+                <i class="fas fa-save"></i> Save Settings
+            </button>
+        </form>
     </div>
 </div>
 

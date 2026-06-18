@@ -203,6 +203,7 @@ function v(array $arr, string $key): string {
     <div class="card-header"><span class="card-title"><i class="fas fa-briefcase text-orange"></i> Internship Details</span></div>
     <div class="card-body">
         <?php
+        // Fetch all departments for the dropdown
         $allDepts = $db->query("SELECT id, name FROM departments ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
         ?>
         <div class="form-row">
@@ -210,11 +211,14 @@ function v(array $arr, string $key): string {
                 <label class="form-label">Department</label>
                 <select name="department_id" class="form-control">
                     <?php foreach ($allDepts as $d): ?>
-                    <option value="<?= $d['id'] ?>" <?= $intern['department_id'] == $d['id'] ? 'selected' : '' ?>>
+                    <option value="<?= $d['id'] ?>" <?= (int)$intern['department_id'] === (int)$d['id'] ? 'selected' : '' ?>>
                         <?= htmlspecialchars($d['name']) ?>
                     </option>
                     <?php endforeach; ?>
                 </select>
+                <span class="form-error" style="color:var(--text-muted);font-size:11px">
+                    Changing department will move the intern's record. DTR and requirements are not affected.
+                </span>
             </div>
             <div class="form-group">
                 <label class="form-label">Supervisor</label>

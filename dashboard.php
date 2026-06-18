@@ -166,4 +166,54 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- Policy Hub Widget -->
+<?php
+$policyCount = $db->query("SELECT COUNT(*) FROM intern_policies WHERE is_active=1")->fetch_row()[0] ?? 0;
+$categories  = $db->query("SELECT DISTINCT category FROM intern_policies WHERE is_active=1 ORDER BY category")->fetch_all(MYSQLI_ASSOC);
+?>
+<div class="card mt-24">
+    <div class="card-header">
+        <span class="card-title"><i class="fas fa-shield-alt text-orange"></i> Intern Policy Hub</span>
+        <a href="/policies.php" class="btn btn-outline btn-sm">View All Policies</a>
+    </div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
+            TDT Powersteel OJT/Intern policies based on the official On-The-Job Training Agreement.
+            All interns are expected to be familiar with these guidelines.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+            <?php
+            $catInfo = [
+                'Traineeship Terms'     => ['fa-handshake',         'var(--info)'],
+                'Attendance & Schedule' => ['fa-calendar-check',    'var(--orange)'],
+                'Dress Code'            => ['fa-tshirt',             '#8B5CF6'],
+                'Conduct & Performance' => ['fa-shield-alt',         'var(--danger)'],
+                'Trainer & Supervision' => ['fa-chalkboard-teacher', 'var(--success)'],
+                'Compensation'          => ['fa-ban',                'var(--gray-mid)'],
+            ];
+            foreach ($categories as $cat):
+                $name = $cat['category'];
+                [$ico, $clr] = $catInfo[$name] ?? ['fa-file-alt', 'var(--orange)'];
+                $cnt = $db->query("SELECT COUNT(*) FROM intern_policies WHERE category='{$db->real_escape_string($name)}' AND is_active=1")->fetch_row()[0];
+            ?>
+            <a href="/policies.php#<?= urlencode($name) ?>"
+               style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:10px;
+                      border:1.5px solid var(--gray-border);text-decoration:none;
+                      transition:border-color .2s,box-shadow .2s"
+               onmouseover="this.style.borderColor='<?= $clr ?>'; this.style.boxShadow='0 2px 12px rgba(0,0,0,.08)'"
+               onmouseout="this.style.borderColor='var(--gray-border)'; this.style.boxShadow='none'">
+                <div style="width:38px;height:38px;border-radius:8px;background:<?= $clr ?>22;
+                             color:<?= $clr ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <i class="fas <?= $ico ?>" style="font-size:16px"></i>
+                </div>
+                <div>
+                    <div style="font-size:12.5px;font-weight:600;color:var(--text-main)"><?= htmlspecialchars($name) ?></div>
+                    <div style="font-size:11px;color:var(--text-muted)"><?= $cnt ?> polic<?= $cnt==1?'y':'ies' ?></div>
+                </div>
+            </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
