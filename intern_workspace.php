@@ -7,7 +7,6 @@ checkSession();
 $db       = getDB();
 $internId = (int)($_GET['id'] ?? 0);
 
-// ── Load intern early (needed for POST handlers) ──────────────────────────
 $stmt = $db->prepare(
     "SELECT i.*, d.name AS dept_name, d.id AS dept_id
      FROM interns i JOIN departments d ON d.id = i.department_id
@@ -20,14 +19,10 @@ $stmt->close();
 
 if (!$intern) { header('Location: /interns.php'); exit; }
 
-// ════════════════════════════════════════════════════════════════════════════
-// ALL POST HANDLERS — must run BEFORE any HTML output
-// ════════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action  = $_POST['action'] ?? '';
     $backTab = '201';
 
-    // ── Profile: update ──────────────────────────────────────────────────
     if ($action === 'update_profile') {
         $backTab = '201';
 

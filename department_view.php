@@ -63,6 +63,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param('ii', $id, $deptId);
         $stmt->execute(); $stmt->close();
         logAudit('ARCHIVE', 'Interns', $id, "Intern #{$id} archived.");
+
+    } elseif ($action === 'unarchive_intern') {
+        $id = (int)($_POST['intern_id'] ?? 0);
+        $stmt = $db->prepare("UPDATE interns SET status='Active' WHERE id=? AND department_id=?");
+        $stmt->bind_param('ii', $id, $deptId);
+        $stmt->execute();
+        $stmt->close();
+        logAudit('RESTORE', 'Interns', $id, "Intern #{$id} restored to active.");
     }
 
     // Restore to Active
@@ -350,6 +358,28 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- Unarchive Confirm Modal -->
+<div class="modal-overlay" id="unarchiveModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title">Restore Intern</span>
+            <button class="modal-close" onclick="closeModal('unarchiveModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="unarchive_intern">
+            <input type="hidden" name="intern_id" id="unarchiveInternId">
+            <div class="modal-body">
+                <p>Restore <strong id="unarchiveInternName"></strong> to Active?</p>
+                <p class="text-muted mt-8" style="font-size:13px">The intern will be moved back to the active list.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('unarchiveModal')">Cancel</button>
+                <button type="submit" class="btn btn-success"><i class="fas fa-undo"></i> Restore</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 const STATUS_LABELS = {
     inactive_intern: {
@@ -386,6 +416,11 @@ function setStatus(id, action, name) {
     btn.textContent = cfg.btn;
     btn.className   = 'btn ' + cfg.btnCls;
     openModal('statusModal');
+}
+function unarchiveIntern(id, name) {
+    document.getElementById('unarchiveInternId').value = id;
+    document.getElementById('unarchiveInternName').textContent = name;
+    openModal('unarchiveModal');
 }
 </script>
 

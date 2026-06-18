@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="POST" action="/login.php" class="login-form" novalidate>
 
             <div class="form-group">
-                <label class="form-label" for="email">Username</label>
+                <label class="form-label" for="email">Email</label>
                 <input
                     type="email"
                     id="email"
