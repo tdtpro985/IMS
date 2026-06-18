@@ -436,12 +436,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             <!-- Success Screen -->
             <div id="successFlow" class="status-card hidden">
-                <div class="animated-envelope">
-                    <i class="fas fa-envelope-open-text"></i>
+                <div class="animated-download">
+                    <i class="fas fa-file-download"></i>
                 </div>
-                <div class="status-title">Check Your Email!</div>
+                <!-- <div class="status-title">Check Your Email!</div> -->
                 <div class="status-text">
-                    We have sent your unique attendance QR code to your email. You can also download it directly below.
+                    Download the QR code below.
                 </div>
 
                 <div class="qr-display">

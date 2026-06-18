@@ -454,6 +454,28 @@ body {
     margin-bottom: 10px;
 }
 
+@keyframes floatDownload {
+    0% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(6px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+.animated-download {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 54px;
+    color: var(--orange);
+    animation: floatDownload 2s ease-in-out infinite;
+    margin-bottom: 10px;
+}
+
 .kiosk-tutorial {
     background: var(--gray-light);
     border: 1px solid var(--gray-border);
