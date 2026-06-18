@@ -81,9 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http');
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-    // Attempt to resolve face service URL dynamically
-    // If running via proxy, the face server is likely on the same host as the IMS
-    $pythonServiceUrl = 'http://localhost:5001/embed';
+    $pythonServiceUrl = 'http://127.0.0.1:5001/embed';
 
     $ch = curl_init($pythonServiceUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -98,7 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlError = curl_error($ch);
-    curl_close($ch);
 
     if ($curlError) {
         echo json_encode(['success' => false, 'error' => 'Face service offline. Please try again later.']);
