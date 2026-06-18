@@ -153,7 +153,7 @@ if ($action === 'clock_in') {
             echo json_encode(['ok' => false, 'message' => 'Already clocked out today']);
         } else {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'message' => "No clock-in found for today! If you forgot to clock out yesterday, please press Clock In to start today's shift."]);
+            echo json_encode(['ok' => false, 'message' => "You forgot to clock out yesterday. Please communicate with HR to fix it."]);
         }
     }
     exit;
