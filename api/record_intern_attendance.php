@@ -68,6 +68,29 @@ if ($hasManual) {
 }
 
 if ($action === 'clock_in') {
+    // Block if there's an unresolved open kiosk entry from a previous day
+    $prevStmt = $db->prepare(
+        "SELECT id, entry_date FROM dtr_entries
+         WHERE intern_id = ? AND entry_date < ? AND time_out IS NULL
+         AND is_archived = 0 AND entry_source = 'kiosk'
+         ORDER BY entry_date DESC LIMIT 1"
+    );
+    $prevStmt->bind_param('is', $internId, $date);
+    $prevStmt->execute();
+    $prevOpen = $prevStmt->get_result()->fetch_assoc();
+    $prevStmt->close();
+
+    if ($prevOpen) {
+        http_response_code(400);
+        echo json_encode([
+            'ok'             => false,
+            'message'        => 'You have an unresolved clock-in from ' . $prevOpen['entry_date'] . '. Please ask your Admin to resolve it before clocking in today.',
+            'pending_date'   => $prevOpen['entry_date'],
+            'requires_admin' => true,
+        ]);
+        exit;
+    }
+
     // Check if there is an open session today (where time_out IS NULL)
     $stmt = $db->prepare("SELECT id FROM dtr_entries WHERE intern_id = ? AND entry_date = ? AND time_out IS NULL AND is_archived = 0 LIMIT 1");
     $stmt->bind_param('is', $internId, $date);
@@ -153,8 +176,30 @@ if ($action === 'clock_in') {
             http_response_code(400);
             echo json_encode(['ok' => false, 'message' => 'Already clocked out today']);
         } else {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'message' => "You forgot to clock out yesterday. Please communicate with HR to fix it."]);
+            // Check for an open (unresolved) entry from a previous day
+            $prevStmt = $db->prepare(
+                "SELECT id, entry_date FROM dtr_entries
+                 WHERE intern_id = ? AND entry_date < ? AND time_out IS NULL
+                 AND is_archived = 0 AND entry_source = 'kiosk'
+                 ORDER BY entry_date DESC LIMIT 1"
+            );
+            $prevStmt->bind_param('is', $internId, $date);
+            $prevStmt->execute();
+            $prevOpen = $prevStmt->get_result()->fetch_assoc();
+            $prevStmt->close();
+
+            if ($prevOpen) {
+                http_response_code(400);
+                echo json_encode([
+                    'ok'              => false,
+                    'message'         => 'You have an unresolved clock-in from ' . $prevOpen['entry_date'] . '. Please ask your Admin to resolve it before clocking in today.',
+                    'pending_date'    => $prevOpen['entry_date'],
+                    'requires_admin'  => true,
+                ]);
+            } else {
+                http_response_code(400);
+                echo json_encode(['ok' => false, 'message' => 'No active clock-in found for today. Please clock in first.']);
+            }
         }
     }
     exit;

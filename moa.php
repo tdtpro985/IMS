@@ -46,12 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 "INSERT INTO moa_agreements (seq, school_name, validity, period_start, period_end, status, remarks, file_path, file_name)
                  VALUES (?,?,?,?,?,?,?,?,?)"
             );
-            $stmt->bind_param('isssssss s', $seq, $school, $validity, $pStart, $pEnd, $status, $remarks, $filePath, $fileName);
-            $stmt->close();
-            $stmt = $db->prepare(
-                "INSERT INTO moa_agreements (seq, school_name, validity, period_start, period_end, status, remarks, file_path, file_name)
-                 VALUES (?,?,?,?,?,?,?,?,?)"
-            );
             $stmt->bind_param('issssssss', $seq, $school, $validity, $pStart, $pEnd, $status, $remarks, $filePath, $fileName);
             $stmt->execute();
             $newId = $db->insert_id; $stmt->close();
