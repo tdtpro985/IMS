@@ -93,20 +93,39 @@ if ($search !== '') {
     $types   .= 's';
 }
 
+// ── Pagination ────────────────────────────────────────────────────────────
+$perPage     = 25;
+$currentPage = max(1, (int)($_GET['page'] ?? 1));
+$offset      = ($currentPage - 1) * $perPage;
+
+// Total count query
+$countSql = "SELECT COUNT(*) FROM interns i JOIN departments d ON d.id = i.department_id {$where}";
+if ($types) {
+    $cStmt = $db->prepare($countSql);
+    $cStmt->bind_param($types, ...$params);
+    $cStmt->execute();
+    $totalInterns = $cStmt->get_result()->fetch_row()[0];
+    $cStmt->close();
+} else {
+    $totalInterns = $db->query($countSql)->fetch_row()[0];
+}
+$totalPages = max(1, (int)ceil($totalInterns / $perPage));
+if ($currentPage > $totalPages) $currentPage = $totalPages;
+
+// Paginated data query
 $sql = "SELECT i.*, d.name AS dept_name FROM interns i
         JOIN departments d ON d.id = i.department_id
         {$where}
-        ORDER BY i.last_name, i.first_name";
+        ORDER BY i.last_name, i.first_name
+        LIMIT ? OFFSET ?";
 
-if ($types) {
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param($types, ...$params);
-    $stmt->execute();
-    $interns = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-} else {
-    $interns = $db->query($sql)->fetch_all(MYSQLI_ASSOC);
-}
+$paginatedParams = array_merge($params, [$perPage, $offset]);
+$paginatedTypes  = $types . 'ii';
+$stmt = $db->prepare($sql);
+$stmt->bind_param($paginatedTypes, ...$paginatedParams);
+$stmt->execute();
+$interns = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 
 $depts = $db->query("SELECT id, name FROM departments ORDER BY name ASC")->fetch_all(MYSQLI_ASSOC);
 
@@ -197,7 +216,7 @@ require_once __DIR__ . '/includes/header.php';
 </div>
 
 <!-- Results -->
-<?php if (empty($interns)): ?>
+<?php if (empty($interns) && $currentPage === 1): ?>
 <div class="card"><div class="card-body">
     <div class="empty-state">
         <i class="fas fa-users"></i>
@@ -207,7 +226,12 @@ require_once __DIR__ . '/includes/header.php';
 <?php else: ?>
 <div class="card">
     <div class="card-header">
-        <span class="card-title"><?= count($interns) ?> <?= $statusFilter ?> Intern<?= count($interns)!=1?'s':'' ?> found</span>
+        <span class="card-title">
+            <?= $totalInterns ?> <?= $statusFilter ?> Intern<?= $totalInterns!=1?'s':'' ?> found
+            <?php if ($totalPages > 1): ?>
+            <span class="text-muted fs-12" style="font-weight:400"> — Page <?= $currentPage ?> of <?= $totalPages ?></span>
+            <?php endif; ?>
+        </span>
     </div>
     <div class="card-body" style="padding:0">
         <div class="table-wrapper">
@@ -310,6 +334,51 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     </div>
 </div>
+
+<?php
+// Build base URL for pagination links
+$paginationBase = '/interns.php?' . http_build_query([
+    'status' => $statusFilter,
+    'dept'   => $deptFilter ?: '',
+    'search' => $search,
+]);
+if ($totalPages > 1): ?>
+<div class="d-flex align-center justify-between mt-16" style="flex-wrap:wrap;gap:10px">
+    <div class="text-muted fs-12">
+        Showing <?= $offset + 1 ?>–<?= min($offset + $perPage, $totalInterns) ?> of <?= $totalInterns ?> interns
+    </div>
+    <div class="d-flex gap-6" style="flex-wrap:wrap">
+        <?php if ($currentPage > 1): ?>
+        <a href="<?= $paginationBase ?>&page=1" class="btn btn-secondary btn-sm">
+            <i class="fas fa-angle-double-left"></i>
+        </a>
+        <a href="<?= $paginationBase ?>&page=<?= $currentPage - 1 ?>" class="btn btn-secondary btn-sm">
+            <i class="fas fa-angle-left"></i> Prev
+        </a>
+        <?php endif; ?>
+
+        <?php
+        $start = max(1, $currentPage - 2);
+        $end   = min($totalPages, $currentPage + 2);
+        for ($p = $start; $p <= $end; $p++):
+        ?>
+        <a href="<?= $paginationBase ?>&page=<?= $p ?>"
+           class="btn btn-sm <?= $p === $currentPage ? 'btn-primary' : 'btn-secondary' ?>">
+            <?= $p ?>
+        </a>
+        <?php endfor; ?>
+
+        <?php if ($currentPage < $totalPages): ?>
+        <a href="<?= $paginationBase ?>&page=<?= $currentPage + 1 ?>" class="btn btn-secondary btn-sm">
+            Next <i class="fas fa-angle-right"></i>
+        </a>
+        <a href="<?= $paginationBase ?>&page=<?= $totalPages ?>" class="btn btn-secondary btn-sm">
+            <i class="fas fa-angle-double-right"></i>
+        </a>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
 <?php endif; ?>
 
 <!-- QR Code Modal -->

@@ -13,6 +13,39 @@ $error   = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
+    // Edit user
+    if ($action === 'edit_user') {
+        $id       = (int)($_POST['user_id'] ?? 0);
+        $name     = trim($_POST['name']  ?? '');
+        $email    = trim($_POST['email'] ?? '');
+        $role     = $_POST['role'] ?? 'hr_staff';
+        $newPass  = $_POST['new_password'] ?? '';
+
+        if (!$name || !$email) {
+            $error = 'Name and email are required.';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Invalid email address.';
+        } elseif ($newPass && strlen($newPass) < 8) {
+            $error = 'New password must be at least 8 characters.';
+        } else {
+            if ($newPass) {
+                $hash = password_hash($newPass, PASSWORD_BCRYPT);
+                $stmt = $db->prepare("UPDATE users SET name=?, email=?, role=?, password=? WHERE id=?");
+                $stmt->bind_param('ssssi', $name, $email, $role, $hash, $id);
+            } else {
+                $stmt = $db->prepare("UPDATE users SET name=?, email=?, role=? WHERE id=?");
+                $stmt->bind_param('sssi', $name, $email, $role, $id);
+            }
+            if ($stmt->execute()) {
+                logAudit('UPDATE', 'Users', $id, "User #{$id} updated: {$name} ({$email}), role: {$role}." . ($newPass ? ' Password changed.' : ''));
+                $success = "User '{$name}' updated successfully.";
+            } else {
+                $error = 'Email already in use by another account.';
+            }
+            $stmt->close();
+        }
+    }
+
     // Add user
     if ($action === 'add_user') {
         $name     = trim($_POST['name'] ?? '');
@@ -153,13 +186,24 @@ require_once __DIR__ . '/includes/header.php';
                         <th>Role</th>
                         <th>Status</th>
                         <th>Created</th>
-                        <th style="width:80px">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($users as $u): ?>
-                <tr>
-                    <td class="fw-600"><?= htmlspecialchars($u['name']) ?></td>
+                <tr style="cursor:pointer"
+                    onclick="openEditUser(<?= htmlspecialchars(json_encode([
+                        'id'        => $u['id'],
+                        'name'      => $u['name'],
+                        'email'     => $u['email'],
+                        'role'      => $u['role'],
+                        'is_locked' => (bool)$u['is_locked'],
+                    ])) ?>)" title="Click to edit">
+                    <td>
+                        <div class="fw-600"><?= htmlspecialchars($u['name']) ?></div>
+                        <?php if ($u['id'] === currentUserId()): ?>
+                        <div class="fs-11 text-muted">(you)</div>
+                        <?php endif; ?>
+                    </td>
                     <td class="text-muted"><?= htmlspecialchars($u['email']) ?></td>
                     <td>
                         <span class="badge <?= $u['role']==='admin'?'badge-approved':'badge-submitted' ?>">
@@ -174,24 +218,87 @@ require_once __DIR__ . '/includes/header.php';
                         <?php endif; ?>
                     </td>
                     <td class="fs-12 text-muted"><?= htmlspecialchars($u['created_at']) ?></td>
-                    <td>
-                        <?php if ($u['is_locked']): ?>
-                        <form method="POST" style="display:inline">
-                            <input type="hidden" name="action"  value="unlock_user">
-                            <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                            <button type="submit" class="btn btn-icon btn-sm" title="Unlock account">
-                                <i class="fas fa-unlock" style="color:var(--success)"></i>
-                            </button>
-                        </form>
-                        <?php endif; ?>
-                    </td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
+        <div class="text-muted fs-12" style="padding:10px 16px">
+            <i class="fas fa-info-circle"></i> Click any row to edit that user.
+        </div>
     </div>
 </div>
+
+<!-- Edit User Modal -->
+<div class="modal-overlay" id="editUserModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span class="modal-title"><i class="fas fa-user-edit text-orange"></i> Edit User</span>
+            <button class="modal-close" onclick="closeModal('editUserModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action"  value="edit_user">
+            <input type="hidden" name="user_id" id="editUserId">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Full Name <span class="required">*</span></label>
+                    <input type="text" name="name" id="editUserName" class="form-control" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email <span class="required">*</span></label>
+                    <input type="email" name="email" id="editUserEmail" class="form-control" required maxlength="150">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role</label>
+                    <select name="role" id="editUserRole" class="form-control">
+                        <option value="hr_staff">HR Staff</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">New Password <span class="text-muted fs-12">(leave blank to keep current)</span></label>
+                    <input type="password" name="new_password" id="editUserPassword"
+                           class="form-control" minlength="8" placeholder="Min 8 characters">
+                </div>
+                <div id="editUserLockedSection" style="display:none;margin-top:12px;padding:12px;
+                     background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:8px">
+                    <div style="font-size:13px;color:var(--danger);margin-bottom:8px">
+                        <i class="fas fa-lock"></i> This account is currently locked.
+                    </div>
+                    <button type="button" class="btn btn-sm" style="background:var(--success);color:#fff"
+                            onclick="unlockFromEditModal()">
+                        <i class="fas fa-unlock"></i> Unlock Account
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditUser(u) {
+    document.getElementById('editUserId').value       = u.id;
+    document.getElementById('editUserName').value     = u.name;
+    document.getElementById('editUserEmail').value    = u.email;
+    document.getElementById('editUserRole').value     = u.role;
+    document.getElementById('editUserPassword').value = '';
+    document.getElementById('editUserLockedSection').style.display = u.is_locked ? 'block' : 'none';
+    openModal('editUserModal');
+}
+
+function unlockFromEditModal() {
+    const id = document.getElementById('editUserId').value;
+    const fd = new FormData();
+    fd.append('action',  'unlock_user');
+    fd.append('user_id', id);
+    fetch('/settings.php', { method:'POST', body:fd })
+        .then(() => { showToast('Account unlocked.', 'success'); setTimeout(() => location.reload(), 800); });
+}
+</script>
 
 <!-- Shift & Hours Settings -->
 <div class="card mb-24">
